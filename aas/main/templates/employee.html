@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Employee</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+
+    <h1>Create Employee</h1>
+
+    <!-- Display Logged-in User -->
+    <div id="user-info">
+        <p>Logged in as: <span id="username"></span></p>
+    </div>
+
+    
+        <button type="submit" id="logoutButton">Logoute</button>
+
+    <form id="employeeForm" method="POST">
+        {% csrf_token %}
+        <label for="fullname">Full Name:</label>
+        <input type="text" id="fullname" name="fullname" required><br><br>
+
+        <label for="email">Email (used as username):</label>
+        <input type="email" id="email" name="email" required><br><br>
+
+        <label for="first_name">First Name:</label>
+        <input type="text" id="first_name" name="first_name" required><br><br>
+
+        <label for="last_name">Last Name:</label>
+        <input type="text" id="last_name" name="last_name" required><br><br>
+
+        <label for="phone_number">Phone Number:</label>
+        <input type="text" id="phone_number" name="phone_number"><br><br>
+
+        <label for="agency">Agency:</label>
+        <select id="agency" name="agency" required>
+            <!-- Dropdown for agencies will be populated by JS -->
+        </select><br><br>
+
+        <label for="date_of_birth">Date of Birth:</label>
+        <input type="date" id="date_of_birth" name="date_of_birth" required><br><br>
+
+        <label for="profile_photo">Profile Photo URL:</label>
+        <input type="text" id="profile_photo" name="profile_photo"><br><br>
+
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required><br><br>
+
+        <label for="group">Group:</label>
+        <select id="group" name="group" required>
+            <!-- Dropdown for groups will be populated by JS -->
+        </select><br><br>
+
+        <button type="submit">Submit</button>
+    </form>
+
+    <script>
+        $(document).ready(function() {
+            // Fetch logged-in user details
+            const token = localStorage.getItem('access_token');  // or sessionStorage, depending on where you stored it
+            if (token) {
+                $.ajax({
+                    url: '/api/user/',
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    },
+                    success: function(data) {
+                        if (data.username) {
+                            $('#username').text(data.username);
+                        } else {
+                            alert("You are not logged in!");
+                            window.location.href = "/login/";
+                        }
+                    },
+                    error: function() {
+                        alert("Authentication failed. Redirecting to login.");
+                        window.location.href = "/login/";
+                    }
+                });
+            } else {
+                alert("Token not found. Redirecting to login.");
+                window.location.href = "/login/";
+            }
+
+
+            $.ajax({
+                url: '/api/outlets/',
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                },
+                success: function(data) {
+                    data.forEach(function(agency) {
+                        $('#outlet').append(new Option(outlet.name, outlet.id));
+                    });
+                },
+                error: function() {
+                    alert("Authentication failed or agencies not found.");
+                    window.location.href = "/login/";
+                }
+            });
+        
+            // Fetch group data for dropdown
+            $.ajax({
+                url: '/api/groups/',
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                },
+                success: function(data) {
+                    data.forEach(function(group) {
+                        $('#group').append(new Option(group.name, group.id));
+                    });
+                },
+                error: function() {
+                    alert("Authentication failed or groups not found.");
+                    window.location.href = "/login/";
+                }
+            });        
+
+            // Handle form submission
+            function getCSRFToken() {
+                return $('input[name="csrfmiddlewaretoken"]').val();
+            }
+    
+            // Handle form submission
+            $('#employeeForm').submit(function(e) {
+                e.preventDefault();
+    
+                const formData = {
+                    fullname: $('#fullname').val(),
+                    email: $('#email').val(),
+                    first_name: $('#first_name').val(),
+                    last_name: $('#last_name').val(),
+                    phone_number: $('#phone_number').val(),
+                    agency: $('#agency').val(),
+                    date_of_birth: $('#date_of_birth').val(),
+                    profile_photo: $('#profile_photo').val(),
+                    password: $('#password').val(),
+                    group: parseInt($('#group').val()) // Add group field to form data
+                };
+    
+                // Submit employee data via POST API with CSRF token in the header
+                $.ajax({
+                    url: '/api/employees/',
+                    type: 'POST',
+                    data: formData,
+                    headers: {
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    success: function(response) {
+                        alert('Employee created successfully!');
+                    },
+                    error: function(error) {
+                        alert('Error creating employee');
+                        console.log(error);
+                    }
+                });
+            });
+
+            $('#logoutButton').click(function() {
+                // Log the current value of the token before removal for debugging
+                console.log("Before logout, token:", localStorage.getItem('access_token'));
+            
+                // Remove JWT token from localStorage or sessionStorage (wherever it's stored)
+                localStorage.removeItem('access_token');  // Or sessionStorage.removeItem('access_token');
+            
+                // Log after removal to ensure it has been cleared
+                console.log("After logout, token:", localStorage.getItem('access_token'));
+            
+                // Optionally, redirect to the login page after logout
+                window.location.href = '/login/';
+            
+                // You can display a message if needed (optional)
+                alert("Logged out successfully!");
+            });
+        });
+    </script>
+
+</body>
+</html>

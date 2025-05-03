@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+
+    <h1>Attendance System</h1>
+
+    <!-- Section: Logged-in User Info -->
+    <div id="user-info">
+        <p>Logged in as: <span id="username"></span></p>
+    </div>
+
+    <!-- Logout Button -->
+    <button type="submit" id="logoutButton">Logoute</button>
+
+    <hr>
+
+    <!-- Section: Punch In -->
+    <h2>Punch In</h2>
+    <form id="punchInForm" method="POST">
+        <input type="file" id="photo_check_in" name="photo_check_in" accept="image/*" />
+
+        <button type="submit">Punch In</button>
+    </form>
+
+    <hr>
+
+    <!-- Section: Punch Out -->
+    <h2>Punch Out</h2>
+    <form id="punchOutForm" method="POST">
+
+        <input type="file" id="photo_check_out" name="photo_check_out" accept="image/*" />
+
+        <button type="submit">Punch Out</button>
+    </form>
+
+    <hr>
+
+    <!-- Section: View Attendance -->
+    <h2>Your Attendance Records</h2>
+    <button id="viewAttendanceButton">View My Attendance</button>
+    <div id="attendanceRecords">
+        <!-- Attendance records will be displayed here -->
+    </div>
+
+    <hr>
+
+    <!-- Section: Outlet Manager - View all Staff Attendance -->
+    <h2>Manager: View Outlet Attendance</h2>
+    <button id="viewOutletAttendanceButton">View Outlet Attendance</button>
+    <div id="outletAttendance">
+        <!-- Outlet attendance records will be displayed here -->
+    </div>
+
+    <hr>
+
+    <!-- Section: Admin - Update Attendance Status -->
+    <h2>Admin/Manager: Update Attendance Status</h2>
+    <label for="attendanceId">Attendance ID:</label>
+    <input type="text" id="attendanceId" name="attendanceId"><br><br>
+
+    <label for="status">Status:</label>
+    <select id="status" name="status">
+        <option value="Present">Present</option>
+        <option value="Late">Late</option>
+        <option value="Absent">Absent</option>
+    </select><br><br>
+
+    <button id="updateStatusButton">Update Status</button>
+
+    <script>
+        $(document).ready(function() {
+
+            const token = localStorage.getItem('access_token');  // or sessionStorage, depending on where you stored it
+            if (token) {
+                $.ajax({
+                    url: '/api/user/',
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    },
+                    success: function(data) {
+                        if (data.username) {
+                            $('#username').text(data.username);
+                        } else {
+                            alert("You are not logged in!");
+                            window.location.href = "/login/";
+                        }
+                    },
+                    error: function() {
+                        alert("Authentication failed. Redirecting to login.");
+                        window.location.href = "/login/";
+                    }
+                });
+            } else {
+                alert("Token not found. Redirecting to login.");
+                window.location.href = "/login/";
+            }
+
+            // Handle Punch In
+            $('#punchInForm').submit(function (e) {
+                e.preventDefault();
+            
+                const formData = new FormData();
+                formData.append('check_in_lat', 12.9719);
+                formData.append('check_in_long', 77.5948);
+            
+                // Replace this with an actual file from input[type="file"]
+                const fileInput = document.getElementById('photo_check_in');
+                if (fileInput.files.length > 0) {
+                    formData.append('photo_check_in', fileInput.files[0]);
+                } else {
+                    alert('Please upload a photo!');
+                    return;
+                }
+            
+                $.ajax({
+                    url: '/api/attendance/punch-in',
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    },
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function (response) {
+                        alert('Punched in successfully!');
+                    },
+                    error: function (error) {
+                        alert('Error punching in!');
+                        console.log(error);
+                    }
+                });
+            });
+
+            $('#logoutButton').click(function() {
+                // Log the current value of the token before removal for debugging
+                console.log("Before logout, token:", localStorage.getItem('access_token'));
+            
+                // Remove JWT token from localStorage or sessionStorage (wherever it's stored)
+                localStorage.removeItem('access_token');  // Or sessionStorage.removeItem('access_token');
+            
+                // Log after removal to ensure it has been cleared
+                console.log("After logout, token:", localStorage.getItem('access_token'));
+            
+                // Optionally, redirect to the login page after logout
+                window.location.href = '/login/';
+            
+                // You can display a message if needed (optional)
+                alert("Logged out successfully!");
+            });
+
+            // Handle Punch Out
+            $('#punchOutForm').submit(function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData();
+                formData.append('check_out_lat',12.9719);
+                formData.append('check_out_long', 77.5948);
+            
+                // Get photo from file input
+                const fileInput = document.getElementById('photo_check_out');
+                if (fileInput.files.length > 0) {
+                    formData.append('photo_check_out', fileInput.files[0]);
+                } else {
+                    alert('Please upload a photo!');
+                    return;
+                }
+            
+                $.ajax({
+                    url: '/api/attendance/punch-out',
+                    method: 'POST',
+                    data: formData,
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    },
+                    processData: false,  // Don't process the data
+                    contentType: false,  // Don't set content type, because FormData will do it
+                    success: function(response) {
+                        alert('Punched out successfully!');
+                    },
+                    error: function(error) {
+                        alert('Error punching out!');
+                        console.log(error);
+                    }
+                });
+            });
+            
+
+            // View Attendance
+            $('#viewAttendanceButton').click(function() {
+                $.get('/api/attendance/me', function(data) {
+                    $('#attendanceRecords').html('<pre>' + JSON.stringify(data, null, 2) + '</pre>');
+                }).fail(function(error) {
+                    alert('Error fetching attendance records!');
+                    console.log(error);
+                });
+            });
+
+            // Manager: View Outlet Attendance
+            $('#viewOutletAttendanceButton').click(function() {
+                $.get('/api/attendance/outlet', function(data) {
+                    $('#outletAttendance').html('<pre>' + JSON.stringify(data, null, 2) + '</pre>');
+                }).fail(function(error) {
+                    alert('Error fetching outlet attendance records!');
+                    console.log(error);
+                });
+            });
+
+            // Admin/Manager: Update Attendance Status
+            $('#updateStatusButton').click(function() {
+                const attendanceId = $('#attendanceId').val();
+                const status = $('#status').val();
+                
+                // Using PUT request for updating
+                $.ajax({
+                    url: `/api/attendance/${attendanceId}/status`,
+                    method: 'PUT',
+                    data: { status: status },
+                    success: function(response) {
+                        alert('Attendance status updated successfully!');
+                    },
+                    error: function(error) {
+                        alert('Error updating attendance status!');
+                        console.log(error);
+                    }
+                });
+            });
+            
+        });
+    </script>
+</body>
+</html>

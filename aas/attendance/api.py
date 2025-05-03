@@ -1,0 +1,437 @@
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday
+from django.utils import timezone
+from main.serializers import EmpLeaveSerializer, HolidaySerializer, AttendanceSerializer
+from django.db.models import Q
+from datetime import datetime, timedelta
+from rest_framework import status
+from main.utils import verify_location, verify_selfie
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+# POST /attendance/punch-in
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def punch_in(request):
+    try:
+        employee = request.user.employee
+        data = request.data
+        
+        # Validate required fields
+        required_fields = ['check_in_lat', 'check_in_long', 'photo_check_in']
+        if not all(field in data for field in required_fields):
+            return Response(
+                {"error": "Missing required fields (lat, long, selfie_url)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        check_in_lat = float(request.POST.get('check_in_lat'))  # Convert to float
+        check_in_long = float(request.POST.get('check_in_long'))  # Convert to float
+
+        
+        # Check for existing punch-in today
+        if Attendance.objects.filter(employee=employee, date=timezone.now().date()).exists():
+            return Response(
+                {"error": "You have already punched in today"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verify location and selfie (implement these functions as shown previously)
+        if not verify_location(employee,check_in_lat, check_in_long):
+            return Response(
+                {"error": "You're not at an allowed location for punch-in"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        verification_result = verify_selfie(data['photo_check_in'], employee)
+        if not verification_result['success']:
+            return Response(
+                {"error": f"Selfie verification failed: {verification_result['message']}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create attendance record
+        attendance = Attendance.objects.create(
+            employee=employee,
+            date=timezone.now().date(),
+            check_in_time=timezone.now(),
+            check_in_lat=float(check_in_lat),
+            check_in_long=float(check_in_long),
+            photo_check_in='sample',
+            # verified='Verified' if verification_result['success'] else 'Requires Review'
+            verified='Pending'
+        )
+        
+        return Response(
+            {
+                "message": "Punch-in recorded successfully!",
+                "data": AttendanceSerializer(attendance).data
+            },
+            status=status.HTTP_201_CREATED
+        )
+        
+    except Exception as e:
+        logger.error(f"Punch-in error: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "An error occurred during punch-in"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def punch_out(request):
+    try:
+        employee = request.user.employee
+        data = request.data
+        
+        # Validate required fields
+        required_fields = ['check_out_lat', 'check_out_long', 'photo_check_out']
+        if not all(field in data for field in required_fields):
+            return Response(
+                {"error": "Missing required fields (lat, long, selfie_url)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        check_out_lat = float(request.POST.get('check_out_lat'))  # Convert to float
+        check_out_long = float(request.POST.get('check_out_long'))  # Convert to float
+
+        # Get today's attendance record
+        attendance = Attendance.objects.filter(
+            employee=employee,
+            date=timezone.now().date()
+        ).first()
+        
+        if not attendance:
+            return Response(
+                {"error": "No punch-in record found for today"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if attendance.check_out_time:
+            return Response(
+                {"error": "You have already punched out today"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verify location and selfie
+        if not verify_location(employee, check_out_lat, check_out_long):
+            return Response(
+                {"error": "You're not at an allowed location for punch-out"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        verification_result = verify_selfie(data['photo_check_out'], employee)
+        if not verification_result['success']:
+            return Response(
+                {"error": f"Selfie verification failed: {verification_result['message']}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update attendance
+        attendance.check_out_time = timezone.now()
+        attendance.check_out_lat = check_out_lat
+        attendance.check_out_long = check_out_long
+        attendance.photo_check_out = 'sample2'
+        attendance.verified = 'Pending' if verification_result['success'] else 'Requires Review'
+        attendance.save()  # This will trigger the auto-calculation in save()
+        
+        return Response(
+            {
+                "message": "Punch-out recorded successfully!",
+                "data": AttendanceSerializer(attendance).data
+            },
+            status=status.HTTP_200_OK
+        )
+        
+    except Exception as e:
+        logger.error(f"Punch-out error: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "An error occurred during punch-out"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+
+# GET /attendance/me - Get logged-in user's attendance
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_my_attendance(request):
+    employee = request.user.employee
+    attendance = Attendance.objects.filter(employee=employee).order_by('-date')
+    
+    data = [{
+        'date': att.date,
+        'check_in_time': att.check_in_time,
+        'check_out_time': att.check_out_time,
+        'status': att.status,
+        'worked_hours': att.worked_hours,
+        'ot_hours': att.ot_hours,
+    } for att in attendance]
+
+    return Response(data)
+
+
+# GET /attendance/outlet - Get attendance for outlet staff (Manager)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_outlet_attendance(request):
+    employee = request.user.employee
+    if not request.user.groups.filter(name="Manager").exists(): 
+        return Response({"message": "You are not authorized to view this information."}, status=403)
+    
+    outlet_staff = Employee.objects.filter(outlet=employee.outlet)
+    attendance = Attendance.objects.filter(employee__in=outlet_staff).order_by('-date')
+
+    data = [{
+        'employee': att.employee.fullname,
+        'date': att.date,
+        'check_in_time': att.check_in_time,
+        'check_out_time': att.check_out_time,
+        'status': att.status,
+        'worked_hours': att.worked_hours,
+    } for att in attendance]
+
+    return Response(data)
+
+
+# GET /attendance/all - Get all attendance records (Admin)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def get_all_attendance(request):
+    attendance = Attendance.objects.all().order_by('-date')
+
+    data = [{
+        'employee': att.employee.fullname,
+        'date': att.date,
+        'check_in_time': att.check_in_time,
+        'check_out_time': att.check_out_time,
+        'status': att.status,
+        'worked_hours': att.worked_hours,
+    } for att in attendance]
+
+    return Response(data)
+
+
+# GET /attendance/{id} - View specific attendance record
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_attendance(request, id):
+    try:
+        attendance = Attendance.objects.get(attendance_id=id)
+    except Attendance.DoesNotExist:
+        return Response({"message": "Attendance record not found."}, status=404)
+
+    data = {
+        'employee': attendance.employee.fullname,
+        'date': attendance.date,
+        'check_in_time': attendance.check_in_time,
+        'check_out_time': attendance.check_out_time,
+        'status': attendance.status,
+        'worked_hours': attendance.worked_hours,
+        'ot_hours': attendance.ot_hours,
+    }
+
+    return Response(data)
+
+
+# PUT /attendance/{id}/status - Mark or update attendance status (Manager/Admin)
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_attendance_status(request, id):
+    try:
+        attendance = Attendance.objects.get(attendance_id=id)
+    except Attendance.DoesNotExist:
+        return Response({"message": "Attendance record not found."}, status=404)
+
+    if not (request.user.groups.filter(name="Manager").exists()):
+        return Response({"message": "You are not authorized to update the status."}, status=403)
+
+    status = request.data.get('status')
+    if status not in ['Present', 'Late', 'Absent']:
+        return Response({"message": "Invalid status."}, status=400)
+
+    attendance.status = status
+    attendance.save()
+
+    return Response({"message": "Attendance status updated."}, status=200)
+
+@api_view(['POST'])
+def apply_leave(request):
+    if request.method == 'POST':
+        serializer = EmpLeaveSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(employee=request.user.employee)  # Assuming the user is logged in and has an associated employee object
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+    
+@api_view(['GET'])
+def my_leave_requests(request):
+    if request.method == 'GET':
+        leave_requests = EmpLeave.objects.filter(employee=request.user.employee)
+        serializer = EmpLeaveSerializer(leave_requests, many=True)
+        return Response(serializer.data)
+
+@api_view(['GET'])
+def pending_leave_requests(request):
+    if not (request.user.groups.filter(name="Manager").exists()):
+        return Response({"message": "You are not authorized to view pending leave requests."}, status=403)
+
+    if request.method == 'GET':
+        pending_requests = EmpLeave.objects.filter(confirm_done=False)
+        serializer = EmpLeaveSerializer(pending_requests, many=True)
+        return Response(serializer.data)
+
+@api_view(['PUT'])
+def approve_leave(request, id):
+    if not (request.user.groups.filter(name="Manager").exists()):
+        return Response({"message": "You are not authorized to approve leave requests."}, status=403)
+
+    try:
+        leave_request = EmpLeave.objects.get(leave_refno=id)
+    except EmpLeave.DoesNotExist:
+        return Response({"message": "Leave request not found."}, status=404)
+
+    leave_request.confirm_done = True
+    leave_request.confirm_date = timezone.now().date()
+    leave_request.confirm_user = request.user
+    leave_request.save()
+
+    return Response({"message": "Leave request approved."}, status=200)
+
+@api_view(['PUT'])
+def reject_leave(request, id):
+    if not (request.user.groups.filter(name="Manager").exists()):
+        return Response({"message": "You are not authorized to reject leave requests."}, status=403)
+
+    try:
+        leave_request = EmpLeave.objects.get(leave_refno=id)
+    except EmpLeave.DoesNotExist:
+        return Response({"message": "Leave request not found."}, status=404)
+
+    leave_request.remove_done = True
+    leave_request.remove_date = timezone.now().date()
+    leave_request.remove_user = request.user
+    leave_request.save()
+
+    return Response({"message": "Leave request rejected."}, status=200)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_holidays(request):
+    holidays = Holiday.objects.all()
+    serializer = HolidaySerializer(holidays, many=True)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_holiday(request):
+    if not (request.user.groups.filter(name="Manager").exists()):
+        return Response({"detail": "Not authorized."}, status=403)
+
+    serializer = HolidaySerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_holiday(request, hcode):
+    if not (request.user.groups.filter(name="Admin").exists()):
+        return Response({"detail": "Not authorized."}, status=403)
+
+    holiday = Holiday.objects.filter(hcode=hcode).first()
+    if not holiday:
+        return Response({"detail": "Holiday not found."}, status=404)
+    
+    serializer = HolidaySerializer(holiday, data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_holiday(request, hcode):
+    if not (request.user.groups.filter(name="Admin").exists()):
+        return Response({"detail": "Not authorized."}, status=403)
+
+    holiday = Holiday.objects.filter(hcode=hcode).first()
+    if not holiday:
+        return Response({"detail": "Holiday not found."}, status=404)
+    holiday.delete()
+    return Response({"message": "Holiday deleted."}, status=204)
+
+
+@api_view(['GET'])
+def generate_report(request):
+    # Required date range
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date') or start_date_str
+
+    # Optional filters
+    user_id = request.GET.get('user_id')
+    outlet = request.GET.get('outlet')  # Assuming outlet is a field in Employee
+
+    if not start_date_str:
+        return Response({"detail": "start_date is required."}, status=400)
+
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+
+    # Filter employees
+    employees = Employee.objects.all()
+    if user_id:
+        employees = employees.filter(id=user_id)
+    if outlet:
+        employees = employees.filter(outlet=outlet)
+
+    report = []
+
+    # Loop through each day and employee
+    current_date = start_date
+    while current_date <= end_date:
+        for employee in employees:
+            attendance = Attendance.objects.filter(employee=employee, date=current_date).first()
+            leave = None if attendance else EmpLeave.objects.filter(
+                employee=employee, leave_date=current_date, leave_status="Approved"
+            ).first()
+            holiday = Holiday.objects.filter(hdate=current_date).first()
+
+            row = {
+                "emp_id": employee.emp_id,
+                "designation": employee.role.designation if hasattr(employee, 'role') else '',
+                "id_no": employee.id_no,
+                "name": employee.name,
+                "date": current_date,
+                "time_in": attendance.time_in if attendance else '',
+                "time_out": attendance.time_out if attendance else '',
+                "type": (
+                    'WD' if attendance else
+                    (leave.leave_type if leave else '')
+                ),
+                "type_name": (
+                    "" if attendance else
+                    (leave.leave_type if leave else '')
+                ),
+                "hcode": holiday.hcode if holiday else '',
+                "htype": holiday.holiday_type if holiday else '',
+                "hname": holiday.holiday_name if holiday else '',
+                "agency": employee.agency
+            }
+
+            report.append(row)
+        current_date += timedelta(days=1)
+
+    return Response(report)
+

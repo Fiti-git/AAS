@@ -1,0 +1,18 @@
+from django.urls import path
+from . import api  # Import views from the current app
+
+urlpatterns = [
+    path('punch-in', api.punch_in, name='punch_in'),
+    path('punch-out', api.punch_out, name='punch_out'),
+    path('me', api.get_my_attendance, name='get_my_attendance'),
+    path('outlet', api.get_outlet_attendance, name='get_outlet_attendance'),
+    path('get_attall', api.get_all_attendance, name='get_all_attendance'),
+    path('get_att/<int:id>', api.get_attendance, name='get_attendance'),
+    path('status/<int:id>', api.update_attendance_status, name='update_attendance_status'),
+    path('applyleave', api.apply_leave, name='apply_leave'),
+    path('myleaverequests', api.my_leave_requests, name='my_leave_requests'),
+    path('pendingleave', api.pending_leave_requests, name='pending_leave_requests'),
+    path('approveleave/<int:id>', api.approve_leave, name='approve_leave'),
+    path('rejectleave/<int:id>', api.reject_leave, name='reject_leave'),
+    path('report/', api.generate_report, name='generate-report'),
+]
