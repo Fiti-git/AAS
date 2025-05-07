@@ -14,8 +14,8 @@ pipeline {
 
         stage('Set Up Python Environment') {
             steps {
-                sh 'python -m venv .venv'
-                sh './.venv/Scripts/pip install --upgrade pip'
+                sh 'python3 -m venv .venv'
+                sh './.venv/bin/pip install --upgrade pip'
             }
         }
 
@@ -23,7 +23,7 @@ pipeline {
             steps {
                 script {
                     if (fileExists('requirements.txt')) {
-                        sh './.venv/Scripts/pip install -r requirements.txt'
+                        sh './.venv/bin/pip install -r requirements.txt'
                     } else {
                         echo 'No requirements.txt found — skipping dependency install.'
                     }
@@ -33,19 +33,19 @@ pipeline {
 
         stage('Run Django Checks') {
             steps {
-                sh './.venv/Scripts/python manage.py check'
+                sh './.venv/bin/python manage.py check'
             }
         }
 
         stage('Run Migrations') {
             steps {
-                sh './.venv/Scripts/python manage.py migrate'
+                sh './.venv/bin/python manage.py migrate'
             }
         }
 
         stage('Run Tests') {
             steps {
-                sh './.venv/Scripts/python manage.py test'
+                sh './.venv/bin/python manage.py test'
             }
         }
     }
