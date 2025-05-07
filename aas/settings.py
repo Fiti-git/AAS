@@ -77,16 +77,18 @@ WSGI_APPLICATION = 'aas.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'AASDB',       # Name of the database you created
-        'USER': 'postgres',     # The user you created in PGAdmin
-        'PASSWORD': 'postgres', # The password for the user
-        'HOST': 'localhost',
-        'PORT': '5432',             # Default PostgreSQL port
+        'NAME': 'AASDB',
+        'USER': 'postgres',
+        'PASSWORD': 'postgres',
+        'HOST': 'postgres-container',  # Container name of PostgreSQL
+        'PORT': '5432',
     }
 }
+
 
 
 
