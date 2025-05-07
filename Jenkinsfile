@@ -49,13 +49,6 @@ pipeline {
                 sh './${VENV_DIR}/bin/python manage.py test'
             }
         }
-
-        stage('Deploy with Gunicorn') {
-            steps {
-                // Running the Gunicorn server on port 8000 (you can change the port if needed)
-                sh './${VENV_DIR}/bin/gunicorn --bind 0.0.0.0:8000 projectname.wsgi:application'
-            }
-        }
     }
 
     post {
