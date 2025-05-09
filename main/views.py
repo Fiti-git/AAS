@@ -7,6 +7,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.models import User, Group
 from .serializers import OutletSerializer
+from django.shortcuts import render
+
+
+def home(request):
+    return render(request, 'home.html')  # Adjust path to the correct template if needed
 
 # View to render the employee creation form
 def employee_form(request):
