@@ -1,14 +1,14 @@
-version: "3.9"
+version: '3.9'
 
 services:
   db:
-    image: postgres
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: AASDB
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
@@ -16,11 +16,18 @@ services:
     build: .
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
-      - .:/code
+      - .:/app
     ports:
       - "8000:8000"
     depends_on:
       - db
+    environment:
+      - DEBUG=True
+      - DATABASE_NAME=AASDB
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
 
 volumes:
   postgres_data:
