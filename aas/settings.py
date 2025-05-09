@@ -84,7 +84,7 @@ DATABASES = {
         'NAME': 'AASDB',
         'USER': 'postgres',
         'PASSWORD': 'postgres',
-        'HOST': 'localhost',  # Container name of PostgreSQL
+        'HOST': 'localhost',  
         'PORT': '5432',
     }
 }
