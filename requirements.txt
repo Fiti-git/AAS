@@ -3,4 +3,4 @@ djangorestframework>=3.14.0
 djangorestframework-simplejwt
 psycopg2-binary>=2.9
 django-cors-headers
-
+gunicorn>=21.2.0

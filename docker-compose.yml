@@ -14,15 +14,16 @@ services:
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000  # Your app still runs on 8000 inside the container
+    command: gunicorn --config gunicorn_config.py yourproject.wsgi:application
     volumes:
       - .:/app
+      - /etc/ssl/self-signed:/etc/ssl/self-signed:ro
     ports:
-      - "80:8000"  
+      - "443:443"   # HTTPS
     depends_on:
       - db
     environment:
-      - DEBUG=True
+      - DEBUG=False
       - DATABASE_NAME=AASDB
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=postgres
