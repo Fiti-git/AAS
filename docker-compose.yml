@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   db:
     image: postgres:15
@@ -8,20 +10,19 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"  # You might change this if needed to avoid port conflicts on host
+      - "5432:5432"
 
   web:
     build: .
-    command: gunicorn --config gunicorn_config.py yourproject.wsgi:application --certfile=/etc/ssl/self-signed/certificate.crt --keyfile=/etc/ssl/self-signed/private.key
+    command: python manage.py runserver 0.0.0.0:8000  # Your app still runs on 8000 inside the container
     volumes:
       - .:/app
-      - /etc/ssl/self-signed:/etc/ssl/self-signed:ro  # Ensure the SSL certs are available
     ports:
-      - "443:443"  # This will serve your app over HTTPS
+      - "80:8000"  # Map host port 80 to container port 8000
     depends_on:
       - db
     environment:
-      - DEBUG=False
+      - DEBUG=True
       - DATABASE_NAME=AASDB
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=postgres
