@@ -8,16 +8,16 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5432:5432"  # You might change this if needed to avoid port conflicts on host
 
   web:
     build: .
-    command: gunicorn --config gunicorn_config.py yourproject.wsgi:application
+    command: gunicorn --config gunicorn_config.py yourproject.wsgi:application --certfile=/etc/ssl/self-signed/certificate.crt --keyfile=/etc/ssl/self-signed/private.key
     volumes:
       - .:/app
-      - /etc/ssl/self-signed:/etc/ssl/self-signed:ro
+      - /etc/ssl/self-signed:/etc/ssl/self-signed:ro  # Ensure the SSL certs are available
     ports:
-      - "443:443"
+      - "443:443"  # This will serve your app over HTTPS
     depends_on:
       - db
     environment:
