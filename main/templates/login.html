@@ -3,62 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to My Site</title>
+    <title>Login Page</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cal+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mui/material@5.6.2/dist/material.min.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Cal Sans', sans-serif;
+            height: 100vh;
+            background-image: url('/bg.jpg');
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .login-container {
+            display: flex;
+            width: 1000px;
+            height: 600px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0px 20px 40px rgba(0,0,0,0.25);
+        }
+
+        .left-side {
+            width: 45%;
+            background-color: #f8f8f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .logo-box {
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: 0px 6px 20px rgba(0,0,0,0.2);
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .right-side {
+            width: 55%;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .error-message {
+            color: red;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .MuiTextField-root {
+            margin: 10px 0;
+            background-color: #fafafa;
+        }
+
+        .MuiButton-root {
+            margin-top: 30px;
+            background-color: #e6b904;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .MuiButton-root:hover {
+            background-color: #d1a803;
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <h1>Welcome to My Site</h1>
-        <nav>
-            <a href="/login/">Login</a>
-        </nav>
-    </header>
 
-    <main>
-        <h2>Login</h2>
+<div class="login-container">
+    <!-- Left Side - Logo -->
+    <div class="left-side">
+        <div class="logo-box">
+            <img src="/logo.png" alt="Logo" style="width: 70%; height: 70%; object-fit: contain;">
+        </div>
+    </div>
 
-        <div id="error" style="color: red; display: none;">
+    <!-- Right Side - Form -->
+    <div class="right-side">
+        <h2 style="text-align: center; font-weight: bold;">Welcome!</h2>
+
+        <div id="error-message" class="error-message" style="display: none;">
             Invalid username or password. Please try again.
         </div>
 
         <form id="login-form">
-            <label for="username">Username:</label>
-            <input type="text" id="username" name="username" required />
-
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required />
-
-            <button type="submit">Login</button>
+            <div>
+                <input type="text" id="username" name="username" placeholder="Username" required 
+                       class="MuiTextField-root" />
+            </div>
+            <div>
+                <input type="password" id="password" name="password" placeholder="Password" required
+                       class="MuiTextField-root" />
+            </div>
+            <div>
+                <button type="submit" class="MuiButton-root" id="login-button">Login</button>
+            </div>
         </form>
+    </div>
+</div>
 
-        <script>
-            document.getElementById('login-form').addEventListener('submit', async function (e) {
-                e.preventDefault();
+<script>
+    document.getElementById('login-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
 
-                const username = document.getElementById('username').value;
-                const password = document.getElementById('password').value;
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorMessageElement = document.getElementById('error-message');
 
-                // Send the username and password to your JWT API for token
-                const response = await fetch('/api/token/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password })
-                });
+        // Simulating the login process (replace this with actual API call)
+        const response = await fetch('/api/token/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password })
+        });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    // Save the tokens in localStorage or sessionStorage
-                    localStorage.setItem('access_token', data.access);
-                    localStorage.setItem('refresh_token', data.refresh);
-                    // Redirect user to the employee form/dashboard
-                    window.location.href = '/employee_form/';  // Change this to your actual dashboard URL
-                } else {
-                    document.getElementById('error').style.display = 'block';
-                }
-            });
-        </script>
-    </main>
+        if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem('access_token', data.access);
+            localStorage.setItem('refresh_token', data.refresh);
+            // Redirect user to the employee form/dashboard
+            window.location.href = '/employee_form/';  // Change this to your actual dashboard URL
+        } else {
+            errorMessageElement.style.display = 'block';
+        }
+    });
+</script>
 
 </body>
 </html>
