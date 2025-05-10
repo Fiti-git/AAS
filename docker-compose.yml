@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   db:
     image: postgres:15
@@ -16,7 +18,7 @@ services:
     volumes:
       - .:/app
     ports:
-      - "8000:8000"  # Keep this for internal communication between containers
+      - "80:8000"  # Map host port 80 to container port 8000
     depends_on:
       - db
     environment:
@@ -26,18 +28,6 @@ services:
       - DATABASE_PASSWORD=postgres
       - DATABASE_HOST=db
       - DATABASE_PORT=5432
-      - DJANGO_SETTINGS_MODULE=myproject.settings.production  # Update based on your settings
-
-  nginx:
-    image: nginx:latest
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf  # Nginx configuration file
-      - ./ssl:/etc/ssl/certs  # SSL certificates (Let's Encrypt or your own)
-    ports:
-      - "443:443"  # Expose HTTPS port
-      - "80:80"    # Expose HTTP port (for HTTP->HTTPS redirect)
-    depends_on:
-      - web  # Ensure Nginx waits for the web service to be up
 
 volumes:
   postgres_data:
