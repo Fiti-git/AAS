@@ -14,11 +14,11 @@ services:
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: python manage.py runserver 0.0.0.0:8000  # Your app still runs on 8000 inside the container
     volumes:
       - .:/app
     ports:
-      - "8000:8000"
+      - "80:8000"  # Map host port 80 to container port 8000
     depends_on:
       - db
     environment:
