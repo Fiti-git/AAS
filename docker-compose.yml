@@ -18,7 +18,7 @@ services:
     volumes:
       - .:/app
     ports:
-      - "80:8000"
+      - "3000:8000"  # Changed from 80:8000 to 3000:8000
     depends_on:
       - db
     environment:
@@ -43,7 +43,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "3000:80"
+      - "80:80"  # Now React is on port 80
     depends_on:
       - web
 
