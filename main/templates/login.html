@@ -1,46 +1,64 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to My Site</title>
+</head>
+<body>
+    <header>
+        <h1>Welcome to My Site</h1>
+        <nav>
+            <a href="/login/">Login</a>
+        </nav>
+    </header>
 
-{% block content %}
-  <h2>Login</h2>
+    <main>
+        <h2>Login</h2>
 
-  <div id="error" style="color: red; display: none;">
-    Invalid username or password. Please try again.
-  </div>
+        <div id="error" style="color: red; display: none;">
+            Invalid username or password. Please try again.
+        </div>
 
-  <form id="login-form">
-    {% csrf_token %}
-    <label for="username">Username:</label>
-    <input type="text" id="username" name="username" required />
+        <form id="login-form">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required />
 
-    <label for="password">Password:</label>
-    <input type="password" id="password" name="password" required />
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required />
 
-    <button type="submit">Login</button>
-  </form>
+            <button type="submit">Login</button>
+        </form>
 
-  <script>
-    document.getElementById('login-form').addEventListener('submit', async function (e) {
-      e.preventDefault();
+        <script>
+            document.getElementById('login-form').addEventListener('submit', async function (e) {
+                e.preventDefault();
 
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
 
-      const response = await fetch('/api/token/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password })
-      });
+                // Send the username and password to your JWT API for token
+                const response = await fetch('/api/token/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
-        window.location.href = '/employee_form/';  // Change this to your actual dashboard URL
-      } else {
-        document.getElementById('error').style.display = 'block';
-      }
-    });
-  </script>
-{% endblock %}
+                if (response.ok) {
+                    const data = await response.json();
+                    // Save the tokens in localStorage or sessionStorage
+                    localStorage.setItem('access_token', data.access);
+                    localStorage.setItem('refresh_token', data.refresh);
+                    // Redirect user to the employee form/dashboard
+                    window.location.href = '/employee_form/';  // Change this to your actual dashboard URL
+                } else {
+                    document.getElementById('error').style.display = 'block';
+                }
+            });
+        </script>
+    </main>
+
+</body>
+</html>
