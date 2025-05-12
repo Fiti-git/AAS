@@ -1,19 +1,67 @@
 <!DOCTYPE html>
+<html>
+<head>
+    <title>Arunalus Supermarket API</title>
+</head>
+<body>
+    <h1>Welcome to Arunalus Supermarket Backend</h1>
+    <p>This is the backend service for Arunalus Supermarket.</p>
+    
+    <p>Status: ✅ Running</p>
+</body>
+</html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Superuser</title>
+    <title>Arunalus Supermarket API</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f8;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 40px 60px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 18px;
+            margin: 8px 0;
+        }
+
+        .status {
+            font-size: 20px;
+            color: green;
+            margin-top: 15px;
+        }
+
+        .status::before {
+            content: "✅ ";
+        }
+    </style>
 </head>
 <body>
-    <h1>Create a notuser</h1>
-    <p>If you need to create a superuser, follow these steps:</p>
-    <p>1. SSH into your server.</p>
-    <p>2. Navigate to your Django project directory.</p>
-    <p>3. Run the following command to create a superuser:</p>
-    <pre>python manage.py createsuperuser</pre>
-    <p>4. Follow the prompts to enter a username, email, and password for the superuser.</p>
-
-    <p>Once done, you can access the Django Admin panel at <a href="/login/">Go to Login</a> and log in using the superuser credentials you created.</p>
+    <div class="container">
+        <h1>Arunalus Supermarket Backend</h1>
+        <p>This is the backend service for Arunalus Supermarket.</p>
+        <p class="status">Running</p>
+    </div>
 </body>
 </html>
