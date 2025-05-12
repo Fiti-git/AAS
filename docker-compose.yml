@@ -39,13 +39,7 @@ services:
     depends_on:
       - db
 
-  frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "80:80"  # Now React is on port 80
-    depends_on:
-      - web
+
 
 volumes:
   postgres_data:
