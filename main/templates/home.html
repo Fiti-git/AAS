@@ -1,20 +1,9 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Arunalus Supermarket API</title>
-</head>
-<body>
-    <h1>Welcome to Arunalus Supermarket Backend</h1>
-    <p>This is the backend service for Arunalus Supermarket.</p>
-    
-    <p>Status: ✅ Running</p>
-</body>
-</html>
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Arunalus Supermarket API</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Status</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -38,30 +27,68 @@
 
         h1 {
             color: #2c3e50;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
         }
 
-        p {
+        .service-item {
+            margin-bottom: 20px;
+        }
+
+        .status-bar {
+            width: 100%;
+            height: 10px;
+            background-color: #dcdfe1;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .running {
+            width: 100%;
+            background-color: #2ecc71; /* Green for running */
+        }
+
+        .status-text {
             font-size: 18px;
-            margin: 8px 0;
+            color: #555;
         }
 
-        .status {
-            font-size: 20px;
-            color: green;
-            margin-top: 15px;
-        }
-
-        .status::before {
-            content: "✅ ";
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Arunalus Supermarket Backend</h1>
-        <p>This is the backend service for Arunalus Supermarket.</p>
-        <p class="status">Running</p>
+        <h1>Service Status</h1>
+
+        <div class="service-item">
+            <h2>Service 1</h2>
+            <div class="status-bar">
+                <span class="running"></span>
+            </div>
+            <p class="status-text">Running</p>
+        </div>
+
+        <div class="service-item">
+            <h2>Service 2</h2>
+            <div class="status-bar">
+                <span class="running"></span>
+            </div>
+            <p class="status-text">Running</p>
+        </div>
+
+        <div class="service-item">
+            <h2>Service 3</h2>
+            <div class="status-bar">
+                <span class="running"></span>
+            </div>
+            <p class="status-text">Running</p>
+        </div>
+
+        <div class="service-item">
+            <h2>Service 4</h2>
+            <div class="status-bar">
+                <span class="running"></span>
+            </div>
+            <p class="status-text">Running</p>
+        </div>
     </div>
 </body>
 </html>
