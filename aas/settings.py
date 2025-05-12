@@ -102,8 +102,6 @@ REST_FRAMEWORK = {
 # ✅ CORS SETTINGS (development-safe)
 CORS_ALLOW_ALL_ORIGINS = True  # ❗ Enable only in development. Restrict for production.
 
-# ✅ For production, use:
 CORS_ALLOWED_ORIGINS = [
-   "http://arunalusupermarket.shop",
-#     "https://your-frontend-domain.com",
+    "http://arunalusupermarket.shop",
 ]
