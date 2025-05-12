@@ -103,7 +103,7 @@ REST_FRAMEWORK = {
 CORS_ALLOW_ALL_ORIGINS = True  # ❗ Enable only in development. Restrict for production.
 
 # ✅ For production, use:
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
+CORS_ALLOWED_ORIGINS = [
+   "http://arunalusupermarket.shop",
 #     "https://your-frontend-domain.com",
-# ]
+]
