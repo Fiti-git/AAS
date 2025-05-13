@@ -4,13 +4,14 @@ services:
   db:
     image: postgres:15
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data  # Ensure data is stored in a persistent volume
     environment:
       POSTGRES_DB: AASDB
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
+    restart: always  # Ensure it restarts automatically if it fails
 
   web:
     build: .
@@ -18,7 +19,7 @@ services:
     volumes:
       - .:/app
     ports:
-      - "3000:8000"  # Changed from 80:8000 to 3000:8000
+      - "3000:8000"
     depends_on:
       - db
     environment:
@@ -28,6 +29,7 @@ services:
       - DATABASE_PASSWORD=postgres
       - DATABASE_HOST=db
       - DATABASE_PORT=5432
+    restart: always
 
   pgadmin:
     image: dpage/pgadmin4
@@ -39,7 +41,6 @@ services:
     depends_on:
       - db
 
-
-
 volumes:
   postgres_data:
+    driver: local  # Persistent volume for the database data
