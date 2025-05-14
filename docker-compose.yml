@@ -4,7 +4,8 @@ services:
   db:
     image: postgres:15
     volumes:
-      - postgres_data:/var/lib/postgresql/data  # Ensure data is stored in a persistent volume
+      - aas_postgres_data:/var/lib/postgresql/data
+# Ensure data is stored in a persistent volume
     environment:
       POSTGRES_DB: AASDB
       POSTGRES_USER: postgres
