@@ -123,4 +123,5 @@ CORS_ALLOW_ALL_ORIGINS = True  # ❗ Enable only in development. Restrict for pr
 CORS_ALLOWED_ORIGINS = [
     "http://arunalusupermarket.shop",
     "https://arunalusupermarket.shop",
+    "http://localhost:3000",
 ]
