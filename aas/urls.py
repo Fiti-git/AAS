@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from rest_framework.decorators import permission_classes
+from users.views import CustomTokenObtainpairView
 
 
 urlpatterns = [
@@ -31,6 +32,7 @@ urlpatterns = [
     path('api/group/<int:id>/', views.group_detail, name='group_detail'),  # GET group details
     path('api/group/<int:id>/update/', views.update_group, name='update_group'),  # PUT to update group
     path('api/group/<int:id>/deactivate/', views.deactivate_group, name='deactivate_group'),  # Deactivate group
-    path('api/token/', permission_classes([])(TokenObtainPairView.as_view()), name='token_obtain_pair'),
+    # path('api/token/', permission_classes([])(TokenObtainPairView.as_view()), name='token_obtain_pair'),
+    path('api/token/', CustomTokenObtainpairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # refresh
 ]
