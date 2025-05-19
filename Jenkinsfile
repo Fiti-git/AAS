@@ -26,9 +26,21 @@ pipeline {
             }
         }
 
+        stage('Wait for DB') {
+            steps {
+                sh '''
+                    echo "Waiting for Postgres to be ready..."
+                    until docker-compose exec db pg_isready -U postgres; do
+                        echo "Postgres is unavailable - sleeping 2s"
+                        sleep 2
+                    done
+                    echo "Postgres is up!"
+                '''
+            }
+        }
+
         stage('Run Migrations') {
             steps {
-                // run django migrations inside the django container
                 sh 'docker-compose exec django python manage.py migrate'
             }
         }
