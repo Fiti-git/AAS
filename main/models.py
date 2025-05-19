@@ -139,7 +139,6 @@ class Agency(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     address = models.CharField(max_length=255)
-    # manager = models.ForeignKey(Employee, related_name="managed_agencies", on_delete=models.SET_NULL, null=True, blank=True)  # Outlet manager is an employee
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -154,10 +153,11 @@ class Outlet(models.Model):
     latitude = models.FloatField()
     longitude = models.FloatField()
     radius_meters = models.IntegerField()  # Allowed punch radius in meters
-    # manager = models.ForeignKey(Employee, related_name="outlet_manager", on_delete=models.SET_NULL, null=True, blank=True)  # Outlet manager is an employee
+    manager = models.ForeignKey(Employee, related_name="outlet_manager", on_delete=models.SET_NULL, null=True, blank=True)  # Outlet manager is an employee
     agency = models.ForeignKey(Agency, null=True, blank=True, on_delete=models.SET_NULL)  # Optional Agency
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    status = models.SmallIntegerField(default=1)
 
     def __str__(self):
         return self.name
