@@ -1,91 +1,45 @@
-version: '3.9'
-
-
-
 services:
-
   db:
-
     image: postgres:15
-
     volumes:
-
-      - aas_postgres_data:/var/lib/postgresql/data
-
-# Ensure data is stored in a persistent volume
-
+      - postgres_data:/var/lib/postgresql/data
     environment:
-
       POSTGRES_DB: AASDB
-
       POSTGRES_USER: postgres
-
       POSTGRES_PASSWORD: postgres
-
     ports:
-
       - "5432:5432"
-
-    restart: always  # Ensure it restarts automatically if it fails
-
-
-
-  web:
-    
-    build: .
-    command: ./entrypoint.sh
-    volumes:
-
-      - .:/app
-
-    ports:
-
-      - "3000:8000"
-
-    depends_on:
-
-      - db
-
-    environment:
-
-      - DEBUG=True
-
-      - DATABASE_NAME=AASDB
-
-      - DATABASE_USER=postgres
-
-      - DATABASE_PASSWORD=postgres
-
-      - DATABASE_HOST=db
-
-      - DATABASE_PORT=5432
-
     restart: always
 
-
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "3000:8000"
+    depends_on:
+      - db
+    environment:
+      DEBUG: "True"
+      DATABASE_NAME: AASDB
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+    restart: always
 
   pgadmin:
-
     image: dpage/pgadmin4
-
     environment:
-
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
-
       PGADMIN_DEFAULT_PASSWORD: admin
-
     ports:
-
       - "5050:80"
-
     depends_on:
-
       - db
-
-
+    restart: always
 
 volumes:
-
   postgres_data:
-
-    driver: local  # Persistent volume for the database data
+    driver: local
