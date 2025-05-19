@@ -1,4 +1,4 @@
-version: '3.8'
+version: '2.4'
 
 services:
   db:
@@ -10,10 +10,7 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - pgdata:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          memory: 1g
+    mem_limit: 700m
 
   pgadmin:
     image: dpage/pgadmin4
@@ -25,10 +22,7 @@ services:
       - "5050:80"
     depends_on:
       - db
-    deploy:
-      resources:
-        limits:
-          memory: 512m
+    mem_limit: 400m
 
   django:
     build: .
@@ -45,10 +39,7 @@ services:
       - "8000:8000"
     depends_on:
       - db
-    deploy:
-      resources:
-        limits:
-          memory: 1g
+    mem_limit: 800m
 
 volumes:
   pgdata:
