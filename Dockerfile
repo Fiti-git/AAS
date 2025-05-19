@@ -1,21 +1,21 @@
-# Dockerfile
+# Step 2: Dockerfile for Django backend
 
-# Use official Python base image
-FROM python:3.11-slim
+FROM python:3.10-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-
-# Set working directory
+# set working directory inside container
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# copy requirements first for caching
+COPY requirements.txt /app/
 
-# Copy project files
-COPY . .
+# install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Run the Django server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# copy all django project files
+COPY . /app/
+
+# expose port 8000 for django dev server
+EXPOSE 8000
+
+# run migrations and start django dev server on all interfaces
+CMD bash -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
