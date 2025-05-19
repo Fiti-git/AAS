@@ -2,56 +2,38 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15
-    restart: always
+    image: postgres:13
+    container_name: django_postgres
     environment:
-      POSTGRES_DB: AASDB
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - arunalu_backend_databse_pgdata:/var/lib/postgresql/data
-    networks:
-      - arunalu_backend_databse_network
-    mem_limit: 700m
+      POSTGRES_DB: mydb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
-  
-  pgadmin:
-    image: dpage/pgadmin4
-    restart: always
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: adminpass
-    ports:
-      - "5050:80"
-    depends_on:
-      - db
-    networks:
-      - arunalu_backend_databse_network
-    mem_limit: 400m
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
-  django:
+  web:
     build: .
-    restart: always
-    environment:
-      DATABASE_NAME: AASDB
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres
-      DATABASE_HOST: db  # The service name for PostgreSQL
-      DATABASE_PORT: "5432"
+    container_name: django_web
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
     volumes:
       - .:/app
     ports:
       - "8000:8000"
     depends_on:
       - db
+    environment:
+      - POSTGRES_DB=AASDB
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+    
     networks:
-      - arunalu_backend_databse_network
-    mem_limit: 800m
-  
-networks:
-  arunalu_backend_databse_network:
-    driver: bridge
+      - webnet
 
 volumes:
-  arunalu_backend_databse_pgdata:
+  postgres_data:
+
+networks:
+  webnet:
