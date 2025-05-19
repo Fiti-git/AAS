@@ -4,25 +4,25 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                checkout scm  // pulls latest code from repo
             }
         }
 
-        stage('Stop Containers') {
+        stage('Stop Django Container') {
             steps {
-                sh 'docker-compose down'
+                sh 'docker-compose stop django'  // only stop django container, keep db running
             }
         }
 
         stage('Build Django Image') {
             steps {
-                sh 'docker-compose build django'
+                sh 'docker-compose build django'  // build new django image with latest code
             }
         }
 
-        stage('Start Containers') {
+        stage('Start Django Container') {
             steps {
-                sh 'docker-compose up -d'
+                sh 'docker-compose up -d --no-deps django'  // start django container only, don't restart db or pgadmin
             }
         }
 
@@ -31,7 +31,7 @@ pipeline {
                 script {
                     timeout(time: 2, unit: 'MINUTES') {
                         waitUntil {
-                            def result = sh (
+                            def result = sh(
                                 script: "docker-compose exec db pg_isready -U postgres",
                                 returnStatus: true
                             )
