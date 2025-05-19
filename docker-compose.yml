@@ -9,7 +9,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - pgdata:/var/lib/postgresql/data   # persist data here
+      - pgdata:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   pgadmin:
     image: dpage/pgadmin4
@@ -21,6 +25,10 @@ services:
       - "5050:80"
     depends_on:
       - db
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   django:
     build: .
@@ -37,6 +45,10 @@ services:
       - "8000:8000"
     depends_on:
       - db
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
 volumes:
   pgdata:
