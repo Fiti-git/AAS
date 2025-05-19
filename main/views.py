@@ -6,7 +6,7 @@ from django.contrib.auth.hashers import make_password
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.models import User, Group
-from .serializers import OutletSerializer
+from .serializers import OutletSerializer, EmployeeSerializer, AgencySerializer
 from django.shortcuts import render
 
 
@@ -22,6 +22,13 @@ def employee_form(request):
 def get_agencies(request):
     agencies = Agency.objects.all().values('id', 'name')  # Get agency id and name
     return JsonResponse(list(agencies), safe=False)
+
+@api_view(['GET'])
+def get_all_employees(request):
+    employees = Employee.objects.all()
+    serializer = EmployeeSerializer(employees, many=True)
+    return Response(serializer.data)
+
 
 # API to create an employee (and user)
 @api_view(['POST'])
@@ -68,18 +75,38 @@ def create_employee(request):
 
         return Response({'message': 'Employee created successfully!'}, status=status.HTTP_201_CREATED)
 
+
 @api_view(['GET'])
 def current_user(request):
     if request.user.is_authenticated:
+        employee = getattr(request.user, 'employee', None)
+
+        if not employee:
+            return Response({"error": "Employee profile not found"}, status=404)
+        outlet_ids = employee.outlet
+
+        outlets = Outlet.objects.filter(id__in=outlet_ids).values('id', 'name')
+
         return Response({
             "id": request.user.id,
             "username": request.user.username,
             "email": request.user.email,
             "first_name": request.user.first_name,
             "last_name": request.user.last_name,
+            "outlets": list(outlets)
         })
-    else:
-        return Response({"error": "Not authenticated"}, status=401)
+
+    return Response({"error": "Not authenticated"}, status=401)
+
+
+    
+@api_view(['POST'])
+def create_agency(request):
+    serializer = AgencySerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 @api_view(['GET'])
 def get_groups(request):
@@ -95,23 +122,26 @@ def create_outlet(request):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['PUT', 'DELETE'])
+@api_view(['PATCH', 'DELETE'])
 def update_or_delete_outlet(request, id):
     try:
         outlet = Outlet.objects.get(pk=id)
     except Outlet.DoesNotExist:
         return Response({'error': 'Outlet not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    if request.method == 'PUT':
-        serializer = OutletSerializer(outlet, data=request.data)
+    if request.method == 'PATCH':
+        serializer = OutletSerializer(outlet, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
-        outlet.delete()
-        return Response({'message': 'Outlet deleted'}, status=status.HTTP_204_NO_CONTENT)
+        outlet.status = 0
+        outlet.save()
+        return Response({'message': 'Outlet marked as inactive'}, status=status.HTTP_200_OK)
+
+    return Response({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 @api_view(['GET'])
 def get_outlets(request, id=None):

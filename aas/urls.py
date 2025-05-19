@@ -16,15 +16,17 @@ urlpatterns = [
     path('', views.home, name='home'),  # Root URL to home page
     path('employee_form/', views.employee_form, name='employee_form'),  # Link to the employee form
     path('api/agencies/', views.get_agencies, name='get_agencies'),
-    path('api/employees/', views.create_employee, name='create_employee'),
+    path('api/getemployees/', views.get_all_employees, name='get_employees'),
+    path('api/employees/create', views.create_employee, name='create_employee'),
     path('api/groups/', views.get_groups, name='get_groups'),
     path('login/', views.loginform_form, name='login'),
     # path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('api/user/', views.current_user, name='current-user'),
+    path('api/agencies/create', views.create_agency, name='create-agency'),
     path('api/outlets/create', views.create_outlet, name='outlet-create'),
     path('api/outlets/', views.get_outlets, name='outlet-detail'),
     path('api/outlets/<int:id>/', views.get_outlets, name='outlet-detail'),
-    path('api/outlets/manage/<int:id>/',  views.get_outlets, name='outlet-manage'),
+    path('api/outlets/manage/<int:id>/',  views.update_or_delete_outlet, name='outlet-manage'),
     path('api/attendance/', include('attendance.apiurls')),
     path('attendance/', include('attendance.urls')),
     path('api/group/', views.list_groups, name='list_groups'),  # GET all groups
