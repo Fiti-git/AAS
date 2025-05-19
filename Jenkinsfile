@@ -10,13 +10,13 @@ pipeline {
 
         stage('Stop Containers') {
             steps {
-                sh 'docker-compose stop'
+                sh 'docker-compose down'
             }
         }
 
-        stage('Build Images') {
+        stage('Build Django Image') {
             steps {
-                sh 'docker-compose build'
+                sh 'docker-compose build django'
             }
         }
 
@@ -28,20 +28,32 @@ pipeline {
 
         stage('Wait for DB') {
             steps {
-                sh '''
-                    echo "Waiting for Postgres to be ready..."
-                    until docker-compose exec db pg_isready -U postgres; do
-                        echo "Postgres is unavailable - sleeping 2s"
-                        sleep 2
-                    done
-                    echo "Postgres is up!"
-                '''
+                script {
+                    timeout(time: 2, unit: 'MINUTES') {
+                        waitUntil {
+                            def result = sh (
+                                script: "docker-compose exec db pg_isready -U postgres",
+                                returnStatus: true
+                            )
+                            if (result == 0) {
+                                echo "Postgres is up!"
+                                return true
+                            } else {
+                                echo "Postgres is unavailable - sleeping 2s"
+                                sleep 2
+                                return false
+                            }
+                        }
+                    }
+                }
             }
         }
 
         stage('Run Migrations') {
             steps {
-                sh 'docker-compose exec django python manage.py migrate'
+                retry(3) {
+                    sh 'docker-compose exec django python manage.py migrate'
+                }
             }
         }
     }
