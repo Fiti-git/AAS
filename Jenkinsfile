@@ -1,59 +1,36 @@
 pipeline {
     agent any
 
-    environment {
-        VENV_DIR = ".venv"
-    }
-
     stages {
         stage('Checkout') {
             steps {
-                // Explicitly use the 'main' branch to avoid errors
-                git branch: 'main', url: 'https://github.com/Fiti-git/AAS.git'
+                checkout scm
             }
         }
 
-        stage('Set Up Python Environment') {
+        stage('Stop Containers') {
             steps {
-                sh 'python3 -m venv ${VENV_DIR}'
-                sh './${VENV_DIR}/bin/pip install --upgrade pip'
+                sh 'docker-compose stop'
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Build Images') {
             steps {
-                script {
-                    if (fileExists('requirements.txt')) {
-                        sh './${VENV_DIR}/bin/pip install -r requirements.txt'
-                    } else {
-                        echo 'No requirements.txt found — skipping dependency install.'
-                    }
-                }
+                sh 'docker-compose build'
             }
         }
 
-        stage('Run Django Checks') {
+        stage('Start Containers') {
             steps {
-                sh './${VENV_DIR}/bin/python manage.py check'
+                sh 'docker-compose up -d'
             }
         }
 
         stage('Run Migrations') {
             steps {
-                sh './${VENV_DIR}/bin/python manage.py migrate'
+                // run django migrations inside the django container
+                sh 'docker-compose exec django python manage.py migrate'
             }
-        }
-
-        stage('Run Tests') {
-            steps {
-                sh './${VENV_DIR}/bin/python manage.py test'
-            }
-        }
-    }
-
-    post {
-        always {
-            cleanWs()
         }
     }
 }
