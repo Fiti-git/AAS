@@ -15,8 +15,9 @@ services:
     restart: always  # Ensure it restarts automatically if it fails
 
   web:
+    
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: ./entrypoint.sh
     volumes:
       - .:/app
     ports:
