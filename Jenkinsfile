@@ -55,16 +55,7 @@ pipeline {
         stage('Run Migrations') {
             steps {
                 retry(3) {
-                    script {
-                        def webRunning = sh(script: "docker inspect -f '{{.State.Running}}' aas-backend", returnStdout: true).trim()
-                        if (webRunning == 'true') {
-                            sh 'docker-compose exec web python manage.py migrate'
-                        } else {
-                            echo "Web container is NOT running! Dumping logs..."
-                            sh 'docker logs aas-backend || echo "No logs available"'
-                            error "Cannot run migrations because web container is not running"
-                        }
-                    }
+                    sh 'docker-compose exec web python manage.py migrate'
                 }
             }
         }
