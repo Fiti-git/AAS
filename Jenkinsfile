@@ -26,9 +26,10 @@ pipeline {
             }
         }
 
-        stage('Start Django Container') {
+        stage('Start Containers') {
             steps {
-                sh 'docker-compose up -d --no-deps web'  // start web container only, don't restart db
+                // start BOTH db and web containers so they share the same network
+                sh 'docker-compose up -d db web'
             }
         }
 
