@@ -1,12 +1,12 @@
 services:
   web:
-    build: .
+    build: ./AAS
     container_name: aas-backend
     command: gunicorn aas.wsgi:application --bind 0.0.0.0:8000
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - ./AAS:/app
     environment:
       - DATABASE_NAME=AASDB
       - DATABASE_USER=postgres
