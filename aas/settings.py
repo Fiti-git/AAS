@@ -123,8 +123,4 @@ SIMPLE_JWT = {
 # ✅ CORS SETTINGS (development-safe)
 CORS_ALLOW_ALL_ORIGINS = True  # ❗ Enable only in development. Restrict for production.
 
-CORS_ALLOWED_ORIGINS = [
-    "http://arunalusupermarket.shop",
-    "https://arunalusupermarket.shop",
-    "http://localhost:3000",
-]
+CORS_ALLOWED_ORIGINS = ['*']

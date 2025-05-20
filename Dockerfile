@@ -1,18 +1,21 @@
-# Use official Python runtime as a parent image
-FROM python:3.9-slim
+# Use official Python slim image
+FROM python:3.10-slim
 
-# Set the working directory in the container
+# Set working dir inside container
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
+# Copy requirements and install deps
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy all project files
 COPY . /app/
 
-# Install dependencies from requirements.txt
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-
-# Expose the port the app runs on
+# Expose port 8000 (default for Django)
 EXPOSE 8000
 
-# Run the Django app using the development server
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Run migrations (optional but good)
+RUN python manage.py migrate
+
+# Start gunicorn server with your project name (aas)
+CMD ["gunicorn", "aas.wsgi:application", "--bind", "0.0.0.0:8000"]

@@ -1,44 +1,33 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:13
-    container_name: django_postgres
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-AASDB}            # Set default DB name
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}     # Set default DB user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres} # Set default DB password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - webnet
-
   web:
     build: .
-    container_name: django_web
-    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
-    volumes:
-      - .:/app
+    container_name: aas-backend
+    command: gunicorn aas.wsgi:application --bind 0.0.0.0:8000
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_NAME=AASDB
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgrespassword
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
     depends_on:
       - db
+
+  db:
+    image: postgres:13
+    container_name: aas-postgres
+    restart: always
     environment:
-      - DEBUG=${DEBUG:-True}                          # Set DEBUG mode
-      - SECRET_KEY=${SECRET_KEY:-'django-insecure-0o(b@duchc*na=6x3022%zag8y(*m5#s#z%gq)1ng6@-p74dih'}  # Secret key
-      - POSTGRES_DB=${POSTGRES_DB:-AASDB}             # Database name
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}      # Database user
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}  # Database password
-      - POSTGRES_HOST=db                               # PostgreSQL service name (container name)
-      - POSTGRES_PORT=5432                            # PostgreSQL port
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-'*'}            # Allowed hosts (comma separated for multiple hosts)
-    networks:
-      - webnet
+      - POSTGRES_DB=AASDB
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgrespassword
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
 volumes:
-  postgres_data:
-
-networks:
-  webnet:
+  pgdata:
