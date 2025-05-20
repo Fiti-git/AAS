@@ -10,12 +10,18 @@ pipeline {
 
         stage('Stop Django Container') {
             steps {
-                sh 'docker-compose stop web'  // only stop web (Django) container, keep db running
+                // stop web container if running, ignore errors if not running
+                sh '''
+                docker-compose stop web || true
+                docker-compose rm -f web || true
+                '''
             }
         }
 
         stage('Build Django Image') {
             steps {
+                // clean up old containers and networks before build
+                sh 'docker-compose down --remove-orphans || true'
                 sh 'docker-compose build web'  // build new web image with latest code
             }
         }

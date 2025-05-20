@@ -15,7 +15,7 @@ COPY . /app/
 EXPOSE 8000
 
 # Run migrations (optional but good)
-RUN python manage.py migrate
+#RUN python manage.py migrate
 
 # Start gunicorn server with your project name (aas)
 CMD ["gunicorn", "aas.wsgi:application", "--bind", "0.0.0.0:8000"]
