@@ -4,13 +4,12 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm  // pulls latest code from repo
+                checkout scm
             }
         }
 
         stage('Stop Django Container') {
             steps {
-                // stop web container if running, ignore errors if not running
                 sh '''
                 docker-compose stop web || true
                 docker-compose rm -f web || true
@@ -20,15 +19,15 @@ pipeline {
 
         stage('Build Django Image') {
             steps {
-                // clean up old containers and networks before build
-                sh 'docker-compose down --remove-orphans || true'
-                sh 'docker-compose build web'  // build new web image with latest code
+                sh '''
+                docker-compose down --remove-orphans || true
+                docker-compose build web
+                '''
             }
         }
 
         stage('Start Containers') {
             steps {
-                // start BOTH db and web containers so they share the same network
                 sh 'docker-compose up -d db web'
             }
         }
@@ -38,10 +37,7 @@ pipeline {
                 script {
                     timeout(time: 2, unit: 'MINUTES') {
                         waitUntil {
-                            def result = sh(
-                                script: "docker-compose exec db pg_isready -U postgres",
-                                returnStatus: true
-                            )
+                            def result = sh(script: "docker-compose exec db pg_isready -U postgres", returnStatus: true)
                             if (result == 0) {
                                 echo "Postgres is up!"
                                 return true
@@ -59,7 +55,16 @@ pipeline {
         stage('Run Migrations') {
             steps {
                 retry(3) {
-                    sh 'docker-compose exec web python manage.py migrate'
+                    script {
+                        def webRunning = sh(script: "docker inspect -f '{{.State.Running}}' aas-backend", returnStdout: true).trim()
+                        if (webRunning == 'true') {
+                            sh 'docker-compose exec web python manage.py migrate'
+                        } else {
+                            echo "Web container is NOT running! Dumping logs..."
+                            sh 'docker logs aas-backend || echo "No logs available"'
+                            error "Cannot run migrations because web container is not running"
+                        }
+                    }
                 }
             }
         }
