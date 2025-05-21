@@ -8,10 +8,10 @@ pipeline {
             }
         }
 
-        // Optional: remove or skip this if Jenkins server doesn't have docker installed
         stage('Build Docker Image') {
             steps {
                 echo "Skipping docker build on Jenkins, build will run on VPS."
+                // if your jenkins server has docker, you can uncomment this line to build locally
                 // sh 'docker build -t aas_django_app . || echo "Skipping docker build on Jenkins"'
             }
         }
@@ -22,6 +22,7 @@ pipeline {
                     sh '''
                     ssh -o StrictHostKeyChecking=no root@139.59.243.2 "
                     cd /home/AAS &&
+                    git pull origin main &&
                     docker-compose down &&
                     docker-compose up -d --build &&
                     docker-compose exec web python manage.py migrate &&
