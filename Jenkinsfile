@@ -25,7 +25,9 @@ pipeline {
                     git pull origin main &&
                     docker-compose down &&
                     docker-compose up -d --build &&
-                    docker-compose exec web python manage.py migrate &&
+                    sleep 10 &&
+                    docker-compose exec web python manage.py makemigrations --noinput &&
+                    docker-compose exec web python manage.py migrate --noinput &&
                     docker-compose ps
                     "
                     '''
