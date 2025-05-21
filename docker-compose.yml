@@ -39,6 +39,7 @@ services:
       - DATABASE_PASSWORD=secure_password123
       - DATABASE_HOST=db
       - DATABASE_PORT=5432
+    restart: always
 volumes:
   aas_pgdata:
   pgadmin_data:
