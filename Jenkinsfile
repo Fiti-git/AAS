@@ -8,15 +8,17 @@ pipeline {
             }
         }
 
+        // Optional: remove or skip this if Jenkins server doesn't have docker installed
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t aas_django_app . || echo "Skipping docker build on Jenkins"'
+                echo "Skipping docker build on Jenkins, build will run on VPS."
+                // sh 'docker build -t aas_django_app . || echo "Skipping docker build on Jenkins"'
             }
         }
 
         stage('Deploy on VPS') {
             steps {
-                sshagent(['your-credential-id']) {
+                sshagent(['3d42b9b2-6283-468e-9eca-7bcb797b8b2f']) {
                     sh '''
                     ssh -o StrictHostKeyChecking=no root@139.59.243.2 "
                     cd /home/AAS &&
@@ -32,7 +34,7 @@ pipeline {
 
         stage('Verify Deployment') {
             steps {
-                sshagent(['your-credential-id']) {
+                sshagent(['3d42b9b2-6283-468e-9eca-7bcb797b8b2f']) {
                     sh '''
                     ssh -o StrictHostKeyChecking=no root@139.59.243.2 "
                     curl -f http://localhost:8000 || echo 'App not responding'
