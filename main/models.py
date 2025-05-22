@@ -96,7 +96,7 @@ class LeaveType(models.Model):
 
 class Holiday(models.Model):
     id = models.AutoField(primary_key=True)  # Auto-incrementing primary key
-    hcode = models.CharField(max_length=50, unique=True)  # Holiday code, unique for each holiday
+    hcode = models.CharField(max_length=50)  # Holiday code, unique for each holiday
     holiday_name = models.CharField(max_length=255)  # Name of the holiday (e.g. Independence Day)
     holiday_type = models.CharField(max_length=50)  # Type of holiday (e.g. public, company)
     holiday_type_name = models.CharField(max_length=100)  # Human-readable type name

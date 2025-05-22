@@ -1,13 +1,16 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
-from .models import Agency, Employee, Outlet, Role
+from .models import Agency, Employee, Outlet, Role, Holiday , LeaveType
 from django.contrib.auth.hashers import make_password
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.models import User, Group
-from .serializers import OutletSerializer, EmployeeSerializer, AgencySerializer
+from .serializers import OutletSerializer, EmployeeSerializer, AgencySerializer, HolidaySerializer, LeaveTypeSerializer
 from django.shortcuts import render
+from rest_framework import viewsets
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
 
 
 def home(request):
@@ -246,6 +249,76 @@ def deactivate_group(request, id):
     group_meta.save()
 
     return Response({"detail": f"Group {group.name} has been deactivated."}, status=status.HTTP_200_OK)
+
+class HolidayListCreateAPIView(APIView):
+    def get(self, request):
+        holidays = Holiday.objects.all()
+        serializer = HolidaySerializer(holidays, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = HolidaySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class HolidayDetailUpdateAPIView(APIView):
+    def get(self, request, pk):
+        holiday = get_object_or_404(Holiday, pk=pk)
+        serializer = HolidaySerializer(holiday)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        holiday = get_object_or_404(Holiday, pk=pk)
+        serializer = HolidaySerializer(holiday, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        holiday = get_object_or_404(Holiday, pk=pk)
+        serializer = HolidaySerializer(holiday, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class LeaveTypeListCreateAPIView(APIView):
+    def get(self, request):
+        leave_types = LeaveType.objects.all()
+        serializer = LeaveTypeSerializer(leave_types, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = LeaveTypeSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class LeaveTypeDetailUpdateAPIView(APIView):
+    def get(self, request, pk):
+        leave_type = get_object_or_404(LeaveType, pk=pk)
+        serializer = LeaveTypeSerializer(leave_type)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        leave_type = get_object_or_404(LeaveType, pk=pk)
+        serializer = LeaveTypeSerializer(leave_type, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        leave_type = get_object_or_404(LeaveType, pk=pk)
+        serializer = LeaveTypeSerializer(leave_type, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
