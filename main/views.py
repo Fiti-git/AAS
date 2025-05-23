@@ -106,13 +106,32 @@ def current_user(request):
     return Response({"error": "Not authenticated"}, status=401)
 
     
-@api_view(['POST'])
-def create_agency(request):
-    serializer = AgencySerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+@api_view(['POST', 'PUT'])
+def create_or_update_agency(request):
+    if request.method == 'POST':
+        # Handle creation
+        serializer = AgencySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'PUT':
+        # Expect an ID in the request data to identify the agency
+        agency_id = request.data.get('id')
+        if not agency_id:
+            return Response({'error': 'Agency ID is required for update.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            agency = Agency.objects.get(id=agency_id)
+        except Agency.DoesNotExist:
+            return Response({'error': 'Agency not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = AgencySerializer(agency, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 @api_view(['GET'])
 def get_groups(request):
