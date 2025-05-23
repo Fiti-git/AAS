@@ -7,7 +7,8 @@ from main.serializers import EmpLeaveSerializer, HolidaySerializer, AttendanceSe
 from django.db.models import Q
 from datetime import datetime, timedelta
 from rest_framework import status
-from main.utils import verify_location, verify_selfie
+from main.utils import verify_location
+from recognizer.views import verify_selfie
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,52 +21,47 @@ def punch_in(request):
     try:
         employee = request.user.employee
         data = request.data
-        
-        # Validate required fields
+
         required_fields = ['check_in_lat', 'check_in_long', 'photo_check_in']
-        if not all(field in data for field in required_fields):
+        if not all(field in data or field in request.FILES for field in required_fields):
             return Response(
-                {"error": "Missing required fields (lat, long, selfie_url)"},
+                {"error": "Missing required fields: check_in_lat, check_in_long, photo_check_in"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        check_in_lat = float(request.POST.get('check_in_lat'))  # Convert to float
-        check_in_long = float(request.POST.get('check_in_long'))  # Convert to float
 
-        
-        # Check for existing punch-in today
+        check_in_lat = float(data.get('check_in_lat'))
+        check_in_long = float(data.get('check_in_long'))
+
         if Attendance.objects.filter(employee=employee, date=timezone.now().date()).exists():
             return Response(
                 {"error": "You have already punched in today"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Verify location and selfie (implement these functions as shown previously)
-        if not verify_location(employee,check_in_lat, check_in_long):
-            return Response(
-                {"error": "You're not at an allowed location for punch-in"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        verification_result = verify_selfie(data['photo_check_in'], employee)
+
+        # if not verify_location(employee, check_in_lat, check_in_long):
+        #     return Response(
+        #         {"error": "You're not at an allowed location for punch-in"},
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
+
+        photo_file = request.FILES.get('photo_check_in')
+        verification_result = verify_selfie(photo_file, employee)
         if not verification_result['success']:
             return Response(
                 {"error": f"Selfie verification failed: {verification_result['message']}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Create attendance record
+
         attendance = Attendance.objects.create(
             employee=employee,
             date=timezone.now().date(),
             check_in_time=timezone.now(),
-            check_in_lat=float(check_in_lat),
-            check_in_long=float(check_in_long),
+            check_in_lat=check_in_lat,
+            check_in_long=check_in_long,
             photo_check_in='sample',
-            # verified='Verified' if verification_result['success'] else 'Requires Review'
-            verified='Pending'
+            verified='Verified'
         )
-        
+
         return Response(
             {
                 "message": "Punch-in recorded successfully!",
@@ -73,7 +69,7 @@ def punch_in(request):
             },
             status=status.HTTP_201_CREATED
         )
-        
+
     except Exception as e:
         logger.error(f"Punch-in error: {str(e)}", exc_info=True)
         return Response(

@@ -7,6 +7,9 @@ import os
 from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 
 SECRET_KEY = 'django-insecure-0o(b@duchc*na=6x3022%zag8y(*m5#s#z%gq)1ng6@-p74dih'
 DEBUG = True

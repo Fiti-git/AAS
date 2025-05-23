@@ -29,8 +29,8 @@ def verify_location(employee, lat, lon):
         print(f"Location verification error: {e}")
         return False
 
-def verify_selfie(selfie_url, employee):
-    try:
+# def verify_selfie(selfie_url, employee):
+#     try:
         # # Load uploaded selfie
         # selfie_response = requests.get(selfie_url)
         # selfie_img = face_recognition.load_image_file(BytesIO(selfie_response.content))
@@ -51,8 +51,8 @@ def verify_selfie(selfie_url, employee):
 
         # # Compare
         # match = face_recognition.compare_faces([stored_encoding[0]], selfie_encoding[0])[0]
-        match = True
-        return {"success": match, "message": "Face matched" if match else "Face did not match"}
+    #     match = True
+    #     return {"success": match, "message": "Face matched" if match else "Face did not match"}
 
-    except Exception as e:
-        return {"success": False, "message": str(e)}
+    # except Exception as e:
+    #     return {"success": False, "message": str(e)}
