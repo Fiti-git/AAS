@@ -4,3 +4,8 @@ djangorestframework-simplejwt
 psycopg2-binary>=2.9
 django-cors-headers
 gunicorn>=21.2.0
+Flask
+numpy
+tensorflow
+psutil
+Pillow
