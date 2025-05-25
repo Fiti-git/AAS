@@ -8,7 +8,7 @@ from django.db.models import Q
 from datetime import datetime, timedelta
 from rest_framework import status
 from main.utils import verify_location
-from recognizer.views import verify_selfie
+from face_recognition.views import verify_selfie
 import logging
 
 logger = logging.getLogger(__name__)

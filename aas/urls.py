@@ -32,8 +32,6 @@ urlpatterns = [
     path('api/outlets/', views.get_outlets, name='outlet-detail'),
     path('api/outlets/<int:id>/', views.get_outlets, name='outlet-detail'),
     path('api/outlets/manage/<int:id>/',  views.update_or_delete_outlet, name='outlet-manage'),
-    path('api/attendance/', include('attendance.apiurls')),
-    path('attendance/', include('attendance.urls')),
     path('api/group/', views.list_groups, name='list_groups'),  # GET all groups
     path('api/group/', views.create_group, name='create_group'),  # POST to create new group
     path('api/group/<int:id>/', views.group_detail, name='group_detail'),  # GET group details
@@ -42,4 +40,7 @@ urlpatterns = [
     # path('api/token/', permission_classes([])(TokenObtainPairView.as_view()), name='token_obtain_pair'),
     path('api/token/', CustomTokenObtainpairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # refresh
+    path('api/attendance/', include('attendance.apiurls')),
+    path('attendance/', include('attendance.urls')),
+    path('admintool/', include('face_recognition.urls')),
 ]
