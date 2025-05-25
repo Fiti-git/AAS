@@ -111,25 +111,23 @@ class Holiday(models.Model):
     class Meta:
         db_table = 'holiday'
 
-# EmpLeave Model
 class EmpLeave(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled'),
+    ]
+
     leave_refno = models.AutoField(primary_key=True)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     leave_date = models.DateField()
-    leave_day = models.CharField(max_length=10)
     leave_type = models.ForeignKey(LeaveType, on_delete=models.SET_NULL, null=True, blank=True)
-    agency = models.CharField(max_length=255, null=True, blank=True)
-    primary_location_code = models.CharField(max_length=100, null=True, blank=True)
+    remarks = models.TextField(null=True, blank=True)  # New field for remarks
     add_date = models.DateField(auto_now_add=True)
-    confirm_date = models.DateField(null=True, blank=True)
-    confirm_done = models.BooleanField(default=False)
-    confirm_user = models.ForeignKey(User, related_name="leave_confirmed_by", on_delete=models.SET_NULL, null=True, blank=True)
-    remove_done = models.BooleanField(default=False)
-    remove_date = models.DateField(null=True, blank=True)
-    remove_user = models.ForeignKey(User, related_name="leave_removed_by", on_delete=models.SET_NULL, null=True, blank=True)
-    hcode = models.ForeignKey(Holiday, on_delete=models.SET_NULL, null=True, blank=True)
-    add_user = models.ForeignKey(User, related_name="leave_added_by", on_delete=models.SET_NULL, null=True, blank=True)
-    max_day_off = models.IntegerField(default=0)
+    action_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="leave_actioned_by")
+    action_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
 
     def __str__(self):
         return f"Leave {self.leave_refno} - {self.employee.fullname}"

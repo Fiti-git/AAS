@@ -10,6 +10,7 @@ from rest_framework import status
 from main.utils import verify_location
 from face_recognition.views import verify_selfie
 import logging
+from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +39,11 @@ def punch_in(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # if not verify_location(employee, check_in_lat, check_in_long):
-        #     return Response(
-        #         {"error": "You're not at an allowed location for punch-in"},
-        #         status=status.HTTP_400_BAD_REQUEST
-        #     )
+        if not verify_location(employee, check_in_lat, check_in_long):
+            return Response(
+                {"error": "You're not at an allowed location for punch-in"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         photo_file = request.FILES.get('photo_check_in')
         verification_result = verify_selfie(photo_file, employee)
@@ -258,14 +259,41 @@ def update_attendance_status(request, id):
 
     return Response({"message": "Attendance status updated."}, status=200)
 
-@api_view(['POST'])
-def apply_leave(request):
-    if request.method == 'POST':
-        serializer = EmpLeaveSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(employee=request.user.employee)  # Assuming the user is logged in and has an associated employee object
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
+class LeaveRequestAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        employee = user.employee  # assuming one-to-one relation
+
+        leave_type_id = request.data.get('leave_type')
+        leave_dates = request.data.get('leave_dates')
+        remarks = request.data.get('remarks', '')
+
+        if not leave_type_id or not leave_dates:
+            return Response({'error': 'leave_type and leave_dates are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            leave_type = LeaveType.objects.get(id=leave_type_id)
+        except LeaveType.DoesNotExist:
+            return Response({'error': 'Invalid leave_type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        created = []
+        for date_str in leave_dates:
+            try:
+                leave_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                obj = EmpLeave.objects.create(
+                    employee=employee,
+                    leave_date=leave_date,
+                    leave_type=leave_type,
+                    remarks=remarks,
+                    status='pending'
+                )
+                created.append(obj.leave_refno)
+            except ValueError:
+                return Response({'error': f'Invalid date format: {date_str}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'message': 'Leave requests submitted.', 'created_ids': created}, status=status.HTTP_201_CREATED)
     
 @api_view(['GET'])
 def my_leave_requests(request):

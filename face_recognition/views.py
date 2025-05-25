@@ -21,13 +21,21 @@ def cosine_similarity(vec1, vec2):
     return np.dot(vec1, vec2) / (norm(vec1) * norm(vec2))
 
 # Face verification using DeepFace
-def verify_employee(img_path, embeddings, labels, threshold=0.7):
+def verify_employee(img_path, embeddings, labels, threshold=0.9):
     try:
-        embedding = DeepFace.represent(img_path=img_path, model_name='Facenet', enforce_detection=True)[0]['embedding']
+        results = DeepFace.represent(img_path=img_path, model_name='Facenet', enforce_detection=True)
+        if not results:
+            return None, "No faces detected in the image"
+        embedding = results[0].get('embedding')
+        if embedding is None or len(embedding) == 0:
+            return None, "No embedding found for the detected face"
     except Exception as e:
         return None, f"Face detection error: {e}"
 
     sims = [cosine_similarity(embedding, emb) for emb in embeddings]
+    if not sims:  # empty embeddings array check
+        return None, "No embeddings found in database to compare"
+
     best_idx = np.argmax(sims)
     best_sim = sims[best_idx]
     best_label = labels[best_idx]
@@ -59,12 +67,13 @@ def verify_selfie(photo_file, employee):
     except Exception as e:
         return {"success": False, "message": f"Error processing image: {str(e)}"}
     finally:
-        os.remove(temp_path)
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 def update_embeddings(request):
     context = {}
     embeddings_dir = os.path.join(settings.BASE_DIR, 'face_recognition')
-    embeddings_file_path = os.path.join(embeddings_dir, 'employee_embeddings_deepface.npz') #file location
+    embeddings_file_path = os.path.join(embeddings_dir, 'employee_embeddings_deepface.npz')  # file location
 
     if request.method == 'POST':
         uploaded_file = request.FILES.get('npz_file')

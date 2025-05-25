@@ -28,31 +28,3 @@ def verify_location(employee, lat, lon):
     except (Outlet.DoesNotExist, TypeError, AttributeError) as e:
         print(f"Location verification error: {e}")
         return False
-
-# def verify_selfie(selfie_url, employee):
-#     try:
-        # # Load uploaded selfie
-        # selfie_response = requests.get(selfie_url)
-        # selfie_img = face_recognition.load_image_file(BytesIO(selfie_response.content))
-
-        # # Load stored image (you'll need a URL or file path)
-        # if not employee.photo_url:  # You should have this saved during employee onboarding
-        #     return {"success": False, "message": "No stored photo to compare against"}
-        
-        # stored_response = requests.get(employee.photo_url)
-        # stored_img = face_recognition.load_image_file(BytesIO(stored_response.content))
-
-        # # Get face encodings
-        # selfie_encoding = face_recognition.face_encodings(selfie_img)
-        # stored_encoding = face_recognition.face_encodings(stored_img)
-
-        # if not selfie_encoding or not stored_encoding:
-        #     return {"success": False, "message": "Could not detect face in one of the images"}
-
-        # # Compare
-        # match = face_recognition.compare_faces([stored_encoding[0]], selfie_encoding[0])[0]
-    #     match = True
-    #     return {"success": match, "message": "Face matched" if match else "Face did not match"}
-
-    # except Exception as e:
-    #     return {"success": False, "message": str(e)}
