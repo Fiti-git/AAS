@@ -3,9 +3,11 @@ import uuid
 import numpy as np
 from numpy.linalg import norm
 from deepface import DeepFace
+from deepface.commons import functions
 from pathlib import Path
 from django.conf import settings
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
 
 # Base directory for model/data files
 BASE_DIR = Path(__file__).resolve().parent
@@ -16,24 +18,34 @@ data = np.load(EMBEDDINGS_PATH)
 saved_embeddings = data['embeddings']
 labels = data['labels']
 
-# Cosine similarity function
 def cosine_similarity(vec1, vec2):
     return np.dot(vec1, vec2) / (norm(vec1) * norm(vec2))
 
-# Face verification using DeepFace
-def verify_employee(img_path, embeddings, labels, threshold=0.9):
+def verify_employee(img_path, embeddings, labels, threshold=0.7):
     try:
-        results = DeepFace.represent(img_path=img_path, model_name='Facenet', enforce_detection=True)
-        if not results:
-            return None, "No faces detected in the image"
-        embedding = results[0].get('embedding')
+        # Detect and crop face using MTCNN
+        img = functions.preprocess_face(
+            img=img_path, 
+            target_size=(160, 160), 
+            detector_backend='mtcnn', 
+            enforce_detection=True
+        )
+        if img is None or img.size == 0:
+            return None, "No face detected or unable to preprocess image"
+
+        # Get embedding from cropped face numpy array
+        embedding = DeepFace.represent(
+            img_path=img, 
+            model_name='Facenet', 
+            enforce_detection=False
+        )[0].get('embedding')
         if embedding is None or len(embedding) == 0:
             return None, "No embedding found for the detected face"
     except Exception as e:
-        return None, f"Face detection error: {e}"
+        return None, f"Face detection or embedding error: {e}"
 
     sims = [cosine_similarity(embedding, emb) for emb in embeddings]
-    if not sims:  # empty embeddings array check
+    if not sims:
         return None, "No embeddings found in database to compare"
 
     best_idx = np.argmax(sims)
@@ -45,8 +57,15 @@ def verify_employee(img_path, embeddings, labels, threshold=0.9):
     else:
         return None, f"No match found (max similarity: {best_sim:.2f})"
 
-# New selfie verification using DeepFace
-def verify_selfie(photo_file, employee):
+def verify_selfie(request, employee):
+    # assuming 'photo' is the name of the file input field
+    if request.method != 'POST':
+        return render(request, 'verify_selfie.html', {'error': 'POST method required.'})
+
+    photo_file = request.FILES.get('photo')
+    if not photo_file:
+        return render(request, 'verify_selfie.html', {'error': 'No photo uploaded.'})
+
     os.makedirs('temp_upload', exist_ok=True)
     temp_filename = f"{uuid.uuid4()}.jpg"
     temp_path = os.path.join('temp_upload', temp_filename)
@@ -58,22 +77,25 @@ def verify_selfie(photo_file, employee):
     try:
         label, message = verify_employee(temp_path, saved_embeddings, labels)
         if label and (
-            str(label).lower() == str(employee.employee_id).lower()
+            str(label).lower() == str(employee.employee_id).lower() 
             or str(label).lower() == employee.fullname.lower()
         ):
-            return {"success": True, "message": message}
+            context = {"success": True, "message": message}
         else:
-            return {"success": False, "message": f"Face mismatch: {message}"}
+            context = {"success": False, "message": f"Face mismatch: {message}"}
     except Exception as e:
-        return {"success": False, "message": f"Error processing image: {str(e)}"}
+        context = {"success": False, "message": f"Error processing image: {str(e)}"}
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+    return render(request, 'verify_selfie_result.html', context)
+
+@csrf_exempt
 def update_embeddings(request):
     context = {}
     embeddings_dir = os.path.join(settings.BASE_DIR, 'face_recognition')
-    embeddings_file_path = os.path.join(embeddings_dir, 'employee_embeddings_deepface.npz')  # file location
+    embeddings_file_path = os.path.join(embeddings_dir, 'employee_embeddings_deepface.npz')
 
     if request.method == 'POST':
         uploaded_file = request.FILES.get('npz_file')
