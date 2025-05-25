@@ -12,3 +12,4 @@ Pillow
 deepface>=0.0.75
 opencv-python-headless>=4.5.5.62
 tf-keras
+protobuf<=3.20.3
