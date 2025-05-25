@@ -5,7 +5,7 @@ psycopg2-binary>=2.9
 django-cors-headers
 gunicorn>=21.2.0
 Flask
-numpy
+numpy<2.0,>=1.24.0
 tensorflow==2.8.0
 psutil
 Pillow
