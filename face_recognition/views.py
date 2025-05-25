@@ -21,7 +21,7 @@ def cosine_similarity(vec1, vec2):
     return np.dot(vec1, vec2) / (norm(vec1) * norm(vec2))
 
 # Face verification using DeepFace
-def verify_employee(img_path, embeddings, labels, threshold=0.7):
+def verify_employee(img_path, embeddings, labels, threshold=0.9):
     try:
         results = DeepFace.represent(img_path=img_path, model_name='Facenet', enforce_detection=True)
         if not results:
