@@ -6,8 +6,9 @@ django-cors-headers
 gunicorn>=21.2.0
 Flask
 numpy
-tensorflow
+tensorflow==2.8.0
 psutil
 Pillow
 deepface>=0.0.75
 opencv-python-headless>=4.5.5.62
+tf-keras
