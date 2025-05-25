@@ -3,7 +3,7 @@ import uuid
 import numpy as np
 from numpy.linalg import norm
 from deepface import DeepFace
-from deepface.commons import functions
+import cv2
 from pathlib import Path
 from django.conf import settings
 from django.shortcuts import render
@@ -21,24 +21,26 @@ labels = data['labels']
 def cosine_similarity(vec1, vec2):
     return np.dot(vec1, vec2) / (norm(vec1) * norm(vec2))
 
+def load_and_detect_face(img_path):
+    # Read image using OpenCV
+    img = cv2.imread(img_path)
+    if img is None:
+        raise ValueError("Image not found or unreadable")
+
+    # Detect, align, and crop face using DeepFace's detectFace (uses mtcnn)
+    detected_face = DeepFace.detectFace(img_path, detector_backend='mtcnn', enforce_detection=True)
+    # detected_face is a numpy array (160x160 RGB)
+    return detected_face
+
 def verify_employee(img_path, embeddings, labels, threshold=0.7):
     try:
-        # Detect and crop face using MTCNN
-        img = functions.preprocess_face(
-            img=img_path, 
-            target_size=(160, 160), 
-            detector_backend='mtcnn', 
-            enforce_detection=True
-        )
+        # detect and crop face first
+        img = load_and_detect_face(img_path)
         if img is None or img.size == 0:
             return None, "No face detected or unable to preprocess image"
 
-        # Get embedding from cropped face numpy array
-        embedding = DeepFace.represent(
-            img_path=img, 
-            model_name='Facenet', 
-            enforce_detection=False
-        )[0].get('embedding')
+        # get embedding from cropped face numpy array
+        embedding = DeepFace.represent(img_path=img, model_name='Facenet', enforce_detection=False)[0].get('embedding')
         if embedding is None or len(embedding) == 0:
             return None, "No embedding found for the detected face"
     except Exception as e:
@@ -58,7 +60,6 @@ def verify_employee(img_path, embeddings, labels, threshold=0.7):
         return None, f"No match found (max similarity: {best_sim:.2f})"
 
 def verify_selfie(request, employee):
-    # assuming 'photo' is the name of the file input field
     if request.method != 'POST':
         return render(request, 'verify_selfie.html', {'error': 'POST method required.'})
 
