@@ -39,11 +39,11 @@ def punch_in(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # if not verify_location(employee, check_in_lat, check_in_long):
-        #     return Response(
-        #         {"error": "You're not at an allowed location for punch-in"},
-        #         status=status.HTTP_400_BAD_REQUEST
-        #     )
+        if not verify_location(employee, check_in_lat, check_in_long):
+            return Response(
+                {"error": "You're not at an allowed location for punch-in"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         photo_file = request.FILES.get('photo_check_in')
         verification_result = verify_selfie(photo_file, employee)
