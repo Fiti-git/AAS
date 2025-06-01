@@ -12,6 +12,6 @@ urlpatterns = [
     path('applyleave/', api.LeaveRequestAPIView.as_view(), name='leave-request'),
     path('myleaverequests', api.my_leave_requests, name='my_leave_requests'),
     path('pendingleave', api.pending_leave_requests, name='pending_leave_requests'),
-    path('updateleavestatus/<int:id>', api.update_leave_status, name='approve_leave'),
+    path('updateleavestatus/<int:id>', api.update_leave_status, name='update_leave_status'),
     path('report/', api.generate_report, name='generate-report'),
 ]
