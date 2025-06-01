@@ -5,7 +5,7 @@ from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday
 from django.utils import timezone
 from main.serializers import EmpLeaveSerializer, HolidaySerializer, AttendanceSerializer
 from django.db.models import Q
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from rest_framework import status
 from main.utils import verify_location
 from face_recognition.views import verify_selfie
@@ -303,48 +303,71 @@ def my_leave_requests(request):
         return Response(serializer.data)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def pending_leave_requests(request):
-    if not (request.user.groups.filter(name="Manager").exists()):
-        return Response({"message": "You are not authorized to view pending leave requests."}, status=403)
+    user = request.user
+    employee = user.employee
 
-    if request.method == 'GET':
-        pending_requests = EmpLeave.objects.filter(confirm_done=False)
-        serializer = EmpLeaveSerializer(pending_requests, many=True)
-        return Response(serializer.data)
+    today = date.today()
+    result = []
+
+    # Fetch all active leave types
+    leave_types = LeaveType.objects.filter(active=True)
+
+    for leave_type in leave_types:
+        # Get the year range from leave type
+        start_date = leave_type.year_start_date
+        end_date = leave_type.year_end_date
+
+        # Get count of used leaves (pending + approved) in the year range
+        used_count = EmpLeave.objects.filter(
+            employee=employee,
+            leave_type=leave_type,
+            status__in=['pending', 'approved'],
+            leave_date__range=(start_date, end_date)
+        ).count()
+
+        allowed = leave_type.att_type_no_of_days_in_year
+        remaining = max(allowed - used_count, 0)
+
+        result.append({
+            'leave_type': leave_type.att_type_name,
+            'leave_code': leave_type.att_type,
+            'allowed': allowed,
+            'used': used_count,
+            'remaining': remaining
+        })
+
+    return Response(result)
 
 @api_view(['PUT'])
-def approve_leave(request, id):
-    if not (request.user.groups.filter(name="Manager").exists()):
-        return Response({"message": "You are not authorized to approve leave requests."}, status=403)
-
+def update_leave_status(request, id):
     try:
-        leave_request = EmpLeave.objects.get(leave_refno=id)
+        leave_request = EmpLeave.objects.select_related('employee__outlet').get(leave_refno=id)
     except EmpLeave.DoesNotExist:
         return Response({"message": "Leave request not found."}, status=404)
 
-    leave_request.confirm_done = True
-    leave_request.confirm_date = timezone.now().date()
-    leave_request.confirm_user = request.user
+    user = request.user
+
+    is_admin = user.is_staff or user.is_superuser
+    is_manager = user.groups.filter(name="Manager").exists()
+    same_outlet = hasattr(user, 'employee') and leave_request.employee.outlet_id == user.employee.outlet_id
+
+    if not (is_admin or (is_manager and same_outlet)):
+        return Response({"message": "You are not authorized to update this leave request."}, status=403)
+
+    new_status = request.data.get('status')
+
+    if new_status not in ['approved', 'rejected']:
+        return Response({"message": "Invalid status. Must be 'approved' or 'rejected'."}, status=400)
+
+    leave_request.status = new_status
+    leave_request.action_date = timezone.now().date()
+    leave_request.action_user = user
     leave_request.save()
 
-    return Response({"message": "Leave request approved."}, status=200)
+    return Response({"message": f"Leave request {new_status}."}, status=200)
 
-@api_view(['PUT'])
-def reject_leave(request, id):
-    if not (request.user.groups.filter(name="Manager").exists()):
-        return Response({"message": "You are not authorized to reject leave requests."}, status=403)
-
-    try:
-        leave_request = EmpLeave.objects.get(leave_refno=id)
-    except EmpLeave.DoesNotExist:
-        return Response({"message": "Leave request not found."}, status=404)
-
-    leave_request.remove_done = True
-    leave_request.remove_date = timezone.now().date()
-    leave_request.remove_user = request.user
-    leave_request.save()
-
-    return Response({"message": "Leave request rejected."}, status=200)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

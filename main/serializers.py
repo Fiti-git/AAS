@@ -37,9 +37,24 @@ class OutletSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class EmpLeaveSerializer(serializers.ModelSerializer):
+    leave_type_id = serializers.IntegerField(source='leave_type.id', read_only=True)
+    leave_type_name = serializers.CharField(source='leave_type.att_type_name', read_only=True)
+
     class Meta:
         model = EmpLeave
-        fields = '__all__'
+        fields = [
+            'leave_refno',
+            'leave_date',
+            'remarks',
+            'add_date',
+            'action_date',
+            'status',
+            'employee',
+            'leave_type_id',
+            'leave_type_name',
+            'action_user'
+        ]
+
 
 class HolidaySerializer(serializers.ModelSerializer):
     class Meta:
