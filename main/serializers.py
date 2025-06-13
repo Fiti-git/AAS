@@ -62,9 +62,31 @@ class HolidaySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class EmployeeSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    is_active = serializers.BooleanField(source='user.is_active', read_only=True)
+    groups = serializers.SerializerMethodField()
+    outlet_name = serializers.CharField(source='outlet.name', read_only=True)  # If outlet has a name field
     class Meta:
         model = Employee
-        fields = '__all__'
+        fields = [
+            'id',
+            'fullname',
+            'phone_number',
+            'profile_photo',
+            'date_of_birth',
+            'outlet',
+            'outlet_name',
+            'email',
+            'first_name',
+            'last_name',
+            'is_active',
+            'groups',
+        ]
+
+    def get_groups(self, obj):
+        return [group.name for group in obj.user.groups.all()]
 
 class AgencySerializer(serializers.ModelSerializer):
     class Meta:

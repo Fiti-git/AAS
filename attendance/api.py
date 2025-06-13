@@ -301,6 +301,12 @@ def my_leave_requests(request):
         leave_requests = EmpLeave.objects.filter(employee=request.user.employee)
         serializer = EmpLeaveSerializer(leave_requests, many=True)
         return Response(serializer.data)
+    
+@api_view(['GET'])
+def all_leave_requests(request):
+    leave_requests = EmpLeave.objects.all()
+    serializer = EmpLeaveSerializer(leave_requests, many=True)
+    return Response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

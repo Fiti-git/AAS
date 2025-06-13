@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/getagencies/', views.get_agencies, name='get_agencies'),
     path('api/getemployees/', views.get_all_employees, name='get_employees'),
     path('api/employees/create', views.create_employee, name='create_employee'),
+    path('api/editemployees/<int:pk>/', views.edit_employee, name='edit_delete_employee'),
     path('api/groups/', views.get_groups, name='get_groups'),
     path('api/holidays/', views.HolidayListCreateAPIView.as_view(), name='holiday-list-create'),
     path('api/holidays/<int:pk>/', views.HolidayDetailUpdateAPIView.as_view(), name='holiday-detail-update'),

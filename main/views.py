@@ -23,7 +23,7 @@ def employee_form(request):
 # API to fetch agencies for the dropdown
 @api_view(['GET'])
 def get_agencies(request):
-    agencies = Agency.objects.all().values('id', 'name')  # Get agency id and name
+    agencies = Agency.objects.all().values('id', 'name', 'address')  # Add address here
     return JsonResponse(list(agencies), safe=False)
 
 @api_view(['GET'])
@@ -78,6 +78,57 @@ def create_employee(request):
 
         return Response({'message': 'Employee created successfully!'}, status=status.HTTP_201_CREATED)
 
+@api_view(['PUT', 'PATCH'])
+def edit_employee(request, employee_id):
+    try:
+        data = request.data
+
+        # Get employee and linked user
+        employee = Employee.objects.get(id=employee_id)
+        user = employee.user
+
+        # Update User model fields
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        user.email = data.get('email', user.email)
+
+        # Optional: update username and password
+        if 'username' in data:
+            user.username = data['username']
+        if 'password' in data and data['password']:
+            user.set_password(data['password'])
+
+        # Handle user activation/deactivation
+        if 'is_active' in data:
+            user.is_active = data['is_active']
+
+        # Optionally update group
+        group_id = data.get('group', None)
+        if group_id:
+            try:
+                group = Group.objects.get(id=group_id)
+                user.groups.clear()
+                user.groups.add(group)
+            except Group.DoesNotExist:
+                return Response({'error': 'Group not found.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.save()
+
+        # Update Employee model fields
+        employee.fullname = data.get('fullname', employee.fullname)
+        employee.phone_number = data.get('phone_number', employee.phone_number)
+        employee.profile_photo = data.get('profile_photo', employee.profile_photo)
+        employee.date_of_birth = data.get('date_of_birth', employee.date_of_birth)
+        employee.outlet_id = data.get('agency', employee.outlet_id)
+
+        employee.save()
+
+        return Response({'message': 'Employee updated successfully.'}, status=status.HTTP_200_OK)
+
+    except Employee.DoesNotExist:
+        return Response({'error': 'Employee not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 def current_user(request):
