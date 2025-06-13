@@ -67,17 +67,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source='user.last_name', read_only=True)
     is_active = serializers.BooleanField(source='user.is_active', read_only=True)
     groups = serializers.SerializerMethodField()
-    outlet_name = serializers.CharField(source='outlet.name', read_only=True)  # If outlet has a name field
+    outlet = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+
     class Meta:
         model = Employee
         fields = [
-            'id',
+            'employee_id',
             'fullname',
             'phone_number',
             'profile_photo',
             'date_of_birth',
             'outlet',
-            'outlet_name',
             'email',
             'first_name',
             'last_name',
