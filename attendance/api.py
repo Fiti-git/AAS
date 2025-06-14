@@ -357,7 +357,11 @@ def update_leave_status(request, id):
 
     is_admin = user.is_staff or user.is_superuser
     is_manager = user.groups.filter(name="Manager").exists()
-    same_outlet = hasattr(user, 'employee') and leave_request.employee.outlet_id == user.employee.outlet_id
+    same_outlet = (
+        hasattr(user, 'employee') and
+        leave_request.employee.outlets.filter(id__in=user.employee.outlets.values_list('id', flat=True)).exists()
+    )
+
 
     if not (is_admin or (is_manager and same_outlet)):
         return Response({"message": "You are not authorized to update this leave request."}, status=403)
