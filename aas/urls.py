@@ -17,6 +17,7 @@ urlpatterns = [
     path('employee_form/', views.employee_form, name='employee_form'),  # Link to the employee form
     path('api/getagencies/', views.get_agencies, name='get_agencies'),
     path('api/getemployees/', views.get_all_employees, name='get_employees'),
+    path('api/getoutletemployees/', views.get_outlet_employees, name='get_outletemployees'),
     path('api/employees/create', views.create_employee, name='create_employee'),
     path('api/editemployees/<int:employee_id>/', views.edit_employee, name='edit_delete_employee'),
     path('api/groups/', views.get_groups, name='get_groups'),

@@ -308,6 +308,36 @@ def all_leave_requests(request):
     serializer = EmpLeaveSerializer(leave_requests, many=True)
     return Response(serializer.data)
 
+def leave_requests_by_outlet(request):
+    user = request.user
+
+    # Check if user is a manager
+    if not user.groups.filter(name="Manager").exists():
+        return Response({"detail": "Access denied. User is not a manager."}, status=403)
+
+    outlet_id = request.query_params.get('outlet_id')
+    if not outlet_id:
+        return Response({"detail": "Missing outlet_id parameter."}, status=400)
+
+    try:
+        outlet_id = int(outlet_id)
+    except ValueError:
+        return Response({"detail": "Invalid outlet_id."}, status=400)
+
+    # Check user has an employee profile
+    employee = getattr(user, 'employee', None)
+    if not employee:
+        return Response({"detail": "Employee profile not found."}, status=404)
+
+    # Check outlet access
+    if not employee.outlets.filter(id=outlet_id).exists():
+        return Response({"detail": "You are not assigned to this outlet."}, status=403)
+
+    # Filter leave requests for employees in that outlet
+    leave_requests = EmpLeave.objects.filter(employee__outlets__id=outlet_id).distinct()
+    serializer = EmpLeaveSerializer(leave_requests, many=True)
+    return Response(serializer.data)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def pending_leave_requests(request):

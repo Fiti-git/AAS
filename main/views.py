@@ -32,6 +32,37 @@ def get_all_employees(request):
     serializer = EmployeeSerializer(employees, many=True)
     return Response(serializer.data)
 
+@api_view(['GET'])
+def get_outlet_employees(request):
+    user = request.user
+
+    # Ensure user is a manager
+    if not user.groups.filter(name="Manager").exists():
+        return Response({"detail": "Access denied. User is not a manager."}, status=403)
+
+    outlet_id = request.query_params.get('outlet_id')
+
+    if not outlet_id:
+        return Response({"detail": "Missing outlet_id parameter."}, status=400)
+
+    try:
+        outlet_id = int(outlet_id)
+    except ValueError:
+        return Response({"detail": "Invalid outlet_id."}, status=400)
+
+    # Ensure user has an associated employee profile
+    employee = getattr(user, 'employee', None)
+    if not employee:
+        return Response({"detail": "Employee profile not found."}, status=404)
+
+    # Check that outlet_id is in manager's outlet list
+    if not employee.outlets.filter(id=outlet_id).exists():
+        return Response({"detail": "You are not assigned to this outlet."}, status=403)
+
+    # Filter employees by outlet
+    employees = Employee.objects.filter(outlets__id=outlet_id).distinct()
+    serializer = EmployeeSerializer(employees, many=True)
+    return Response(serializer.data)
 
 # API to create an employee (and user)
 @api_view(['POST'])
