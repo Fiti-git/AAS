@@ -76,7 +76,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'phone_number',
             'profile_photo',
             'date_of_birth',
-            'outlet',
+            'outlets',
             'email',
             'first_name',
             'last_name',
