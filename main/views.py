@@ -41,7 +41,7 @@ def create_employee(request):
     fullname = data.get('fullname')
     email = data.get('email')
     phone_number = data.get('phone_number', '')
-    outlet_ids = data.get('outlets', [])  # Should be a list of outlet IDs
+    outlet_ids = request.data.getlist('outlets')
     date_of_birth = data.get('date_of_birth')
     profile_photo = data.get('profile_photo', '')
     password = data.get('password')
