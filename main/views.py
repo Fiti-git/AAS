@@ -170,12 +170,8 @@ def current_user(request):
         if not employee:
             return Response({"error": "Employee profile not found"}, status=404)
 
-        outlet_ids = getattr(employee, 'outlet', []) or []
-        
-        if not outlet_ids:
-            outlets = []
-        else:
-            outlets = Outlet.objects.filter(id__in=outlet_ids).values('id', 'name')
+        outlet_ids = employee.outlets.values_list('id', flat=True)
+        outlets = Outlet.objects.filter(id__in=outlet_ids).values('id', 'name')
 
         return Response({
             "id": request.user.id,

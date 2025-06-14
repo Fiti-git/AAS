@@ -349,7 +349,7 @@ def pending_leave_requests(request):
 @api_view(['PUT'])
 def update_leave_status(request, id):
     try:
-        leave_request = EmpLeave.objects.select_related('employee__outlet').get(leave_refno=id)
+        leave_request = EmpLeave.objects.select_related('employee__user').prefetch_related('employee__outlets').get(leave_refno=id)
     except EmpLeave.DoesNotExist:
         return Response({"message": "Leave request not found."}, status=404)
 
