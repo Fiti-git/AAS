@@ -10,7 +10,7 @@ class Employee(models.Model):
     phone_number = models.CharField(max_length=20, null=True, blank=True)
     profile_photo = models.URLField(null=True, blank=True)
     date_of_birth = models.DateField()
-    outlet = models.JSONField(max_length=255, null=True, blank=True)
+    outlets = models.ManyToManyField('Outlet', related_name='employees', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

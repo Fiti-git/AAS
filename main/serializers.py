@@ -67,7 +67,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source='user.last_name', read_only=True)
     is_active = serializers.BooleanField(source='user.is_active', read_only=True)
     groups = serializers.SerializerMethodField()
-    outlet = serializers.JSONField()  # ✅ fix for JSONField
+    outlets = serializers.PrimaryKeyRelatedField(queryset=Outlet.objects.all(), many=True)
     class Meta:
         model = Employee
         fields = [
@@ -76,7 +76,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'phone_number',
             'profile_photo',
             'date_of_birth',
-            'outlet',         # Now correctly treated as plain JSON
+            'outlet',
             'email',
             'first_name',
             'last_name',

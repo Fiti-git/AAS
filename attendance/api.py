@@ -183,7 +183,7 @@ def get_outlet_attendance(request):
     if not request.user.groups.filter(name="Manager").exists(): 
         return Response({"message": "You are not authorized to view this information."}, status=403)
     
-    outlet_staff = Employee.objects.filter(outlet=employee.outlet)
+    outlet_staff = Employee.objects.filter(outlets__in=employee.outlets.all()).distinct()
     attendance = Attendance.objects.filter(employee__in=outlet_staff).order_by('-date')
 
     data = [{
@@ -447,7 +447,7 @@ def generate_report(request):
     if user_id:
         employees = employees.filter(id=user_id)
     if outlet:
-        employees = employees.filter(outlet=outlet)
+        employees = employees.filter(outlets=outlet)
 
     report = []
 

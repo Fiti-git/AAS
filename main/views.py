@@ -36,47 +36,63 @@ def get_all_employees(request):
 # API to create an employee (and user)
 @api_view(['POST'])
 def create_employee(request):
-    if request.method == 'POST':
-        data = request.data
-        
-        # Extract employee data from the request
-        fullname = data.get('fullname')
-        email = data.get('email')
-        phone_number = data.get('phone_number', '')
-        agency_id = data.get('agency')
-        date_of_birth = data.get('date_of_birth')
-        profile_photo = data.get('profile_photo', '')
-        password = data.get('password')
-        username = data.get('fullname')  # The username to assign to the user
-        first_name = data.get('first_name')  # The first name of the user
-        last_name = data.get('last_name')  # The last name of the user
-        group_id = data.get('group', '')  # The group to assign to the user (optional)
+    data = request.data
+    
+    fullname = data.get('fullname')
+    email = data.get('email')
+    phone_number = data.get('phone_number', '')
+    outlet_ids = data.get('outlets', [])  # Should be a list of outlet IDs
+    date_of_birth = data.get('date_of_birth')
+    profile_photo = data.get('profile_photo', '')
+    password = data.get('password')
+    username = data.get('fullname')  # Or some unique username logic
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    group_id = data.get('group', '')
 
-        # Create user
+    # Basic validations (add more as needed)
+    if not all([fullname, email, password, date_of_birth]):
+        return Response({'error': 'fullname, email, password and date_of_birth are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Create user
+    try:
         user = User.objects.create_user(
-            username=username,  # Username from the request
+            username=username,
             email=email,
             password=password,
-            first_name=first_name,  # First name from the request
-            last_name=last_name,  # Last name from the request
+            first_name=first_name,
+            last_name=last_name,
         )
+    except Exception as e:
+        return Response({'error': f'Error creating user: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Optionally assign the user to a group if provided
-        if group_id:
-            group, created = Group.objects.get_or_create(id=group_id)
+    if group_id:
+        try:
+            group = Group.objects.get(id=group_id)
             user.groups.add(group)
+        except Group.DoesNotExist:
+            return Response({'error': 'Group not found'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create employee
-        employee = Employee.objects.create(
-            user=user,
-            fullname=fullname,
-            phone_number=phone_number,
-            profile_photo=profile_photo,
-            date_of_birth=date_of_birth,
-            outlet=agency_id,
-        )
+    # Create employee (without outlets)
+    employee = Employee.objects.create(
+        user=user,
+        fullname=fullname,
+        phone_number=phone_number,
+        profile_photo=profile_photo,
+        date_of_birth=date_of_birth,
+    )
 
-        return Response({'message': 'Employee created successfully!'}, status=status.HTTP_201_CREATED)
+    # Assign outlets (many-to-many)
+    if outlet_ids:
+        if not isinstance(outlet_ids, list):
+            outlet_ids = [outlet_ids]
+        # Validate outlets exist
+        valid_outlets = Outlet.objects.filter(id__in=outlet_ids)
+        if valid_outlets.count() != len(outlet_ids):
+            return Response({'error': 'One or more outlets not found'}, status=status.HTTP_400_BAD_REQUEST)
+        employee.outlets.set(valid_outlets)
+
+    return Response({'message': 'Employee created successfully!'}, status=status.HTTP_201_CREATED)
 
 @api_view(['PUT', 'PATCH'])
 def edit_employee(request, employee_id):
@@ -119,9 +135,15 @@ def edit_employee(request, employee_id):
         employee.phone_number = data.get('phone_number', employee.phone_number)
         employee.profile_photo = data.get('profile_photo', employee.profile_photo)
         employee.date_of_birth = data.get('date_of_birth', employee.date_of_birth)
-        employee.outlet_id = data.get('agency', employee.outlet_id)
+        outlet_ids = data.get('outlets', None)
+        if outlet_ids:
+            if not isinstance(outlet_ids, list):
+                outlet_ids = [outlet_ids]
+            valid_outlets = Outlet.objects.filter(id__in=outlet_ids)
+            employee.outlets.set(valid_outlets)
 
         employee.save()
+
 
         return Response({'message': 'Employee updated successfully.'}, status=status.HTTP_200_OK)
 
