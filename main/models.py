@@ -2,16 +2,6 @@ from django.db import models
 from django.contrib.auth.models import User, Group
 import uuid
 
-# UserDevice Model (Missing Model)
-class UserDevice(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    uuid = models.CharField(max_length=255)  # Unique identifier for the device
-    device_type = models.CharField(max_length=50)  # Device type: personal or company
-    outlet = models.ForeignKey('Outlet', null=True, blank=True, on_delete=models.SET_NULL)  # If it’s a company device, link it to an outlet
-
-    def __str__(self):
-        return f"{self.user.username} - {self.device_type}"
-
 # Employee Model
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -23,12 +13,13 @@ class Employee(models.Model):
     outlets = models.ManyToManyField('Outlet', related_name='employees', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
     def __str__(self):
         return self.fullname
 
 # Attendance Model
 class Attendance(models.Model):
+    # Status choices
     STATUS_CHOICES = [
         ('Present', 'Present'),
         ('Late', 'Late'),
@@ -37,6 +28,7 @@ class Attendance(models.Model):
         ('On Leave', 'On Leave'),
     ]
     
+    # Verification status choices
     VERIFICATION_CHOICES = [
         ('Pending', 'Pending'),
         ('Verified', 'Verified'),
@@ -61,39 +53,40 @@ class Attendance(models.Model):
     verified = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    verification_notes = models.TextField(null=True, blank=True)
+    verification_notes = models.TextField(null=True, blank=True)  # For admin comments
     
     class Meta:
-        unique_together = ('employee', 'date')
+        unique_together = ('employee', 'date')  # Prevent duplicate entries
         ordering = ['-date', 'employee']
         verbose_name_plural = 'Attendance Records'
-
+    
     def __str__(self):
         return f"{self.employee.fullname} - {self.date} - {self.status}"
     
     def save(self, *args, **kwargs):
+        # Auto-calculate worked hours when punching out
         if self.check_out_time and self.check_in_time:
             delta = self.check_out_time - self.check_in_time
             self.worked_hours = round(delta.total_seconds() / 3600, 2)
             
+            # Auto-determine status based on worked hours
             if self.worked_hours < 4:
                 self.status = 'Half Day'
             elif self.worked_hours > 8:
                 self.ot_hours = self.worked_hours - 8
         super().save(*args, **kwargs)
-
-# LeaveType Model
+    
 class LeaveType(models.Model):
-    id = models.AutoField(primary_key=True)
-    att_type = models.CharField(max_length=50, unique=True)
-    att_type_name = models.CharField(max_length=255)
-    active = models.BooleanField(default=True)
-    att_type_group = models.CharField(max_length=100)
-    att_type_per_day_hours = models.DecimalField(max_digits=5, decimal_places=2)
-    pay_percentage = models.DecimalField(max_digits=5, decimal_places=2)
-    att_type_no_of_days_in_year = models.IntegerField()
-    year_start_date = models.DateField()
-    year_end_date = models.DateField()
+    id = models.AutoField(primary_key=True)  # Explicitly adding an auto-incrementing primary key field
+    att_type = models.CharField(max_length=50, unique=True)  # Unique identifier for attendance type
+    att_type_name = models.CharField(max_length=255)  # Name of the attendance type
+    active = models.BooleanField(default=True)  # Whether the leave type is active or not
+    att_type_group = models.CharField(max_length=100)  # Group or category of the leave type
+    att_type_per_day_hours = models.DecimalField(max_digits=5, decimal_places=2)  # Number of hours allocated per day for this leave type
+    pay_percentage = models.DecimalField(max_digits=5, decimal_places=2)  # Percentage of pay allocated for this leave type
+    att_type_no_of_days_in_year = models.IntegerField()  # Number of leave days allowed per year
+    year_start_date = models.DateField()  # Start date of the leave year
+    year_end_date = models.DateField()  # End date of the leave year
 
     def __str__(self):
         return f"{self.att_type_name} ({self.att_type})"
@@ -101,17 +94,16 @@ class LeaveType(models.Model):
     class Meta:
         db_table = 'leave_type'
 
-# Holiday Model
 class Holiday(models.Model):
-    id = models.AutoField(primary_key=True)
-    hcode = models.CharField(max_length=50)
-    holiday_name = models.CharField(max_length=255)
-    holiday_type = models.CharField(max_length=50)
-    holiday_type_name = models.CharField(max_length=100)
-    hdate = models.DateField()
-    active = models.BooleanField(default=True)
-    holiday_ot_pay_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    holiday_regular_pay_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    id = models.AutoField(primary_key=True)  # Auto-incrementing primary key
+    hcode = models.CharField(max_length=50)  # Holiday code, unique for each holiday
+    holiday_name = models.CharField(max_length=255)  # Name of the holiday (e.g. Independence Day)
+    holiday_type = models.CharField(max_length=50)  # Type of holiday (e.g. public, company)
+    holiday_type_name = models.CharField(max_length=100)  # Human-readable type name
+    hdate = models.DateField()  # Date of holiday
+    active = models.BooleanField(default=True)  # Whether the holiday is currently active
+    holiday_ot_pay_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)  # Extra OT pay on this day
+    holiday_regular_pay_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)  # Base pay if worked on holiday
 
     def __str__(self):
         return f"{self.holiday_name} ({self.hcode})"
@@ -119,7 +111,6 @@ class Holiday(models.Model):
     class Meta:
         db_table = 'holiday'
 
-# EmpLeave Model
 class EmpLeave(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -132,7 +123,7 @@ class EmpLeave(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     leave_date = models.DateField()
     leave_type = models.ForeignKey(LeaveType, on_delete=models.SET_NULL, null=True, blank=True)
-    remarks = models.TextField(null=True, blank=True)
+    remarks = models.TextField(null=True, blank=True)  # New field for remarks
     add_date = models.DateField(auto_now_add=True)
     action_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="leave_actioned_by")
     action_date = models.DateField(null=True, blank=True)
@@ -141,16 +132,27 @@ class EmpLeave(models.Model):
     def __str__(self):
         return f"Leave {self.leave_refno} - {self.employee.fullname}"
 
-# Outlet Model
+# Agency Model (Optional for context)
+class Agency(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    address = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+# Outlets Model
 class Outlet(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     address = models.CharField(max_length=255)
     latitude = models.FloatField()
     longitude = models.FloatField()
-    radius_meters = models.IntegerField()
-    manager = models.ForeignKey(Employee, related_name="outlet_manager", on_delete=models.SET_NULL, null=True, blank=True)
-    agency = models.ForeignKey('Agency', null=True, blank=True, on_delete=models.SET_NULL)
+    radius_meters = models.IntegerField()  # Allowed punch radius in meters
+    manager = models.ForeignKey(Employee, related_name="outlet_manager", on_delete=models.SET_NULL, null=True, blank=True)  # Outlet manager is an employee
+    agency = models.ForeignKey(Agency, null=True, blank=True, on_delete=models.SET_NULL)  # Optional Agency
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     status = models.SmallIntegerField(default=1)
@@ -158,7 +160,6 @@ class Outlet(models.Model):
     def __str__(self):
         return self.name
 
-# Role Model
 class Role(models.Model):
     group = models.OneToOneField(Group, on_delete=models.CASCADE)
     designation = models.CharField(max_length=255)
@@ -168,7 +169,9 @@ class Role(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.group.name
+        return self.group.name  # Returns the group name as a string representation
 
     class Meta:
         db_table = 'role'
+
+    
