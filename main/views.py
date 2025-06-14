@@ -116,7 +116,17 @@ def edit_employee(request, employee_id):
 
         # Handle user activation/deactivation
         if 'is_active' in data:
-            user.is_active = data['is_active']
+            is_active = data['is_active']
+            if isinstance(is_active, str):
+                if is_active.lower() == 'true':
+                    is_active = True
+                elif is_active.lower() == 'false':
+                    is_active = False
+                else:
+                    # Optionally handle invalid strings here
+                    is_active = False  # or raise an error
+            user.is_active = is_active
+
 
         # Optionally update group
         group_id = data.get('group', None)
