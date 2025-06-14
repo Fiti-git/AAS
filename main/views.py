@@ -100,7 +100,7 @@ def edit_employee(request, employee_id):
         data = request.data
 
         # Get employee and linked user
-        employee = Employee.objects.get(id=employee_id)
+        employee = Employee.objects.get(employee_id=employee_id)
         user = employee.user
 
         # Update User model fields
