@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User, Group
 import uuid
+from django.core.exceptions import ValidationError
 
 # Employee Model
 class Employee(models.Model):
@@ -174,4 +175,22 @@ class Role(models.Model):
     class Meta:
         db_table = 'role'
 
-    
+class UserDevice(models.Model):
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE)
+    uuid = models.CharField(max_length=255, unique=True)
+    device_type = models.CharField(max_length=50, choices=[
+        ('personal', 'Personal'),
+        ('company', 'Company'),
+    ])
+    outlet = models.ForeignKey('Outlet', null=True, blank=True, on_delete=models.SET_NULL)
+    registered_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        # Enforce that exactly one of `user` or `outlet` is set
+        if bool(self.user) == bool(self.outlet):
+            raise ValidationError("Device must be linked to either a user or an outlet, not both or neither.")
+
+    def __str__(self):
+        target = self.user.username if self.user else self.outlet.name if self.outlet else "Unassigned"
+        return f"{self.device_type} - {target}"
+

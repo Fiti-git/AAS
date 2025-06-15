@@ -44,5 +44,6 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # refresh
     path('api/attendance/', include('attendance.apiurls')),
     path('attendance/', include('attendance.urls')),
+    path('api/users/', include('users.apiurls')),
     path('admintool/', include('face_recognition.urls')),
 ]
