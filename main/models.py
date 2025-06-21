@@ -175,7 +175,7 @@ class Role(models.Model):
     class Meta:
         db_table = 'role'
 
-class UserDevice(models.Model):
+class Devices(models.Model):
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE)
     device_id = models.CharField(max_length=255, unique=True)
     device_type = models.CharField(max_length=50, choices=[
