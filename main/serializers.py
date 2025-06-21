@@ -51,7 +51,7 @@ class EmpLeaveSerializer(serializers.ModelSerializer):
             'action_date',
             'status',
             'employee',
-            'employee_name'
+            'employee_name',
             'leave_type_id',
             'leave_type_name',
             'action_user'
