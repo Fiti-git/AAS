@@ -308,6 +308,7 @@ def all_leave_requests(request):
     serializer = EmpLeaveSerializer(leave_requests, many=True)
     return Response(serializer.data)
 
+@api_view(['GET'])
 def leave_requests_by_outlet(request):
     user = request.user
 
