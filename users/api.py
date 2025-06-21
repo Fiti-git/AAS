@@ -24,7 +24,7 @@ class ValidateDeviceAPIView(APIView):
             return Response({
                 "detail": "No personal device registered.",
                 "devicenotregistered": True
-            }, status=status.HTTP_403_FORBIDDEN)
+            }, status=status.HTTP_200_OK)
 
         if user_device.device_id == device_id:
             return Response({
@@ -35,7 +35,7 @@ class ValidateDeviceAPIView(APIView):
         return Response({
             "detail": "This is not your authorized device.",
             "unauthorized": True
-        }, status=status.HTTP_403_FORBIDDEN)
+        }, status=status.HTTP_200_OK)
 
 class RegisterDeviceAPIView(APIView):
     permission_classes = [IsAuthenticated]
