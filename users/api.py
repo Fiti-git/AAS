@@ -13,32 +13,27 @@ class ValidateDeviceAPIView(APIView):
         user = request.user
         device_id = request.data.get("device_id")
 
-        # Check if user has a registered device
+        if not device_id:
+            return Response({
+                "detail": "Missing device_id.",
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             user_device = UserDevice.objects.get(user=user)
-            if user_device.device_id == device_id:
-                return Response({"detail": "Device verified as user device."}, status=status.HTTP_200_OK)
         except UserDevice.DoesNotExist:
-            user_device = None
-
-        # Check outlet device
-        try:
-            employee = Employee.objects.get(user=user)
-            outlet_device = UserDevice.objects.get(outlet=employee.outlet)
-            if outlet_device.device_id == device_id:
-                return Response({"detail": "Device verified as outlet device."}, status=status.HTTP_200_OK)
-        except (Employee.DoesNotExist, UserDevice.DoesNotExist):
-            pass
-
-        if not user_device:
             return Response({
-                "detail": "No personal device registered and this device isn't recognized.",
-                "devicenotregistered": True,
-                "can_register_device": True
+                "detail": "No personal device registered.",
+                "devicenotregistered": True
             }, status=status.HTTP_403_FORBIDDEN)
 
+        if user_device.device_id == device_id:
+            return Response({
+                "detail": "Device verified as user device.",
+                "authorized": True
+            }, status=status.HTTP_200_OK)
+
         return Response({
-            "detail": "Unauthorized device.",
+            "detail": "This is not your authorized device.",
             "unauthorized": True
         }, status=status.HTTP_403_FORBIDDEN)
 
