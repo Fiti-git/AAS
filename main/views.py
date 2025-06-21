@@ -176,7 +176,7 @@ def edit_employee(request, employee_id):
         employee.phone_number = data.get('phone_number', employee.phone_number)
         employee.profile_photo = data.get('profile_photo', employee.profile_photo)
         employee.date_of_birth = data.get('date_of_birth', employee.date_of_birth)
-        outlet_ids = data.get('outlets', None)
+        outlet_ids = request.data.getlist('outlets')
         if outlet_ids:
             if not isinstance(outlet_ids, list):
                 outlet_ids = [outlet_ids]
