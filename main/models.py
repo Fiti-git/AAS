@@ -177,12 +177,11 @@ class Role(models.Model):
 
 class UserDevice(models.Model):
     user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE)
-    uuid = models.CharField(max_length=255, unique=True)
+    device_id = models.CharField(max_length=255, unique=True)
     device_type = models.CharField(max_length=50, choices=[
         ('personal', 'Personal'),
         ('company', 'Company'),
     ])
-    outlet = models.ForeignKey('Outlet', null=True, blank=True, on_delete=models.SET_NULL)
     registered_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):
