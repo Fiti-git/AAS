@@ -17,6 +17,14 @@ class ValidateDeviceAPIView(APIView):
             return Response({
                 "detail": "Missing device_id.",
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            registered = Devices.objects.get(device_id=device_id)
+        except Devices.DoesNotExist:
+            return Response({
+                "detail": "No personal device registered.",
+                "devicenotregistered": True
+            }, status=status.HTTP_200_OK)
 
         try:
             user_device = Devices.objects.get(user=user)

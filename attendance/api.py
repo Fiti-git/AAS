@@ -23,15 +23,16 @@ def punch_in(request):
         employee = request.user.employee
         data = request.data
 
-        required_fields = ['check_in_lat', 'check_in_long', 'photo_check_in']
+        required_fields = ['check_in_lat', 'check_in_long', 'photo_check_in', 'authorized']
         if not all(field in data or field in request.FILES for field in required_fields):
             return Response(
-                {"error": "Missing required fields: check_in_lat, check_in_long, photo_check_in"},
+                {"error": "Missing required fields: check_in_lat, check_in_long, photo_check_in, authorized"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         check_in_lat = float(data.get('check_in_lat'))
         check_in_long = float(data.get('check_in_long'))
+        authorized = data.get('authorized') in ['true', 'True', True]
 
         if Attendance.objects.filter(employee=employee, date=timezone.now().date()).exists():
             return Response(
@@ -45,13 +46,18 @@ def punch_in(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        photo_file = request.FILES.get('photo_check_in')
-        verification_result = verify_selfie(photo_file, employee)
-        if not verification_result['success']:
-            return Response(
-                {"error": f"Selfie verification failed: {verification_result['message']}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        verified_status = 'Pending'
+        selfie_message = None
+
+        if authorized:
+            verified_status = 'Verified'
+        else:
+            photo_file = request.FILES.get('photo_check_in')
+            verification_result = verify_selfie(photo_file, employee)
+            if verification_result['success']:
+                verified_status = 'Verified'
+            else:
+                selfie_message = f"Selfie not verified: {verification_result['message']}"
 
         attendance = Attendance.objects.create(
             employee=employee,
@@ -59,17 +65,19 @@ def punch_in(request):
             check_in_time=timezone.now(),
             check_in_lat=check_in_lat,
             check_in_long=check_in_long,
-            photo_check_in='sample',
-            verified='Verified'
+            photo_check_in='sample',  # Replace this later with file path
+            verified=verified_status
         )
 
-        return Response(
-            {
-                "message": "Punch-in recorded successfully!",
-                "data": AttendanceSerializer(attendance).data
-            },
-            status=status.HTTP_201_CREATED
-        )
+        response_data = {
+            "message": "Punch-in recorded successfully!",
+            "data": AttendanceSerializer(attendance).data
+        }
+
+        if selfie_message:
+            response_data["warning"] = selfie_message
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
     except Exception as e:
         logger.error(f"Punch-in error: {str(e)}", exc_info=True)
