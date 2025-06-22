@@ -23,7 +23,7 @@ def punch_in(request):
         employee = request.user.employee
         data = request.data
 
-        required_fields = ['check_in_lat', 'check_in_long', 'photo_check_in', 'authorized']
+        required_fields = ['check_in_lat', 'check_in_long', 'authorized']
         if not all(field in data or field in request.FILES for field in required_fields):
             return Response(
                 {"error": "Missing required fields: check_in_lat, check_in_long, photo_check_in, authorized"},
@@ -92,58 +92,50 @@ def punch_out(request):
     try:
         employee = request.user.employee
         data = request.data
-        
+
         # Validate required fields
-        required_fields = ['check_out_lat', 'check_out_long', 'photo_check_out']
+        required_fields = ['check_out_lat', 'check_out_long']
         if not all(field in data for field in required_fields):
             return Response(
-                {"error": "Missing required fields (lat, long, selfie_url)"},
+                {"error": "Missing required fields (check_out_lat, check_out_long)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        check_out_lat = float(request.POST.get('check_out_lat'))  # Convert to float
-        check_out_long = float(request.POST.get('check_out_long'))  # Convert to float
+
+        check_out_lat = float(data.get('check_out_lat'))
+        check_out_long = float(data.get('check_out_long'))
 
         # Get today's attendance record
         attendance = Attendance.objects.filter(
             employee=employee,
             date=timezone.now().date()
         ).first()
-        
+
         if not attendance:
             return Response(
                 {"error": "No punch-in record found for today"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         if attendance.check_out_time:
             return Response(
                 {"error": "You have already punched out today"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Verify location and selfie
+
+        # Verify location
         if not verify_location(employee, check_out_lat, check_out_long):
             return Response(
                 {"error": "You're not at an allowed location for punch-out"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        verification_result = verify_selfie(data['photo_check_out'], employee)
-        if not verification_result['success']:
-            return Response(
-                {"error": f"Selfie verification failed: {verification_result['message']}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Update attendance
+
+        # Update attendance (without verifying or changing 'verified' field)
         attendance.check_out_time = timezone.now()
         attendance.check_out_lat = check_out_lat
         attendance.check_out_long = check_out_long
-        attendance.photo_check_out = 'sample2'
-        attendance.verified = 'Pending' if verification_result['success'] else 'Requires Review'
-        attendance.save()  # This will trigger the auto-calculation in save()
-        
+        attendance.photo_check_out = 'sample2'  # Replace with actual file handling
+        attendance.save()
+
         return Response(
             {
                 "message": "Punch-out recorded successfully!",
@@ -151,7 +143,7 @@ def punch_out(request):
             },
             status=status.HTTP_200_OK
         )
-        
+
     except Exception as e:
         logger.error(f"Punch-out error: {str(e)}", exc_info=True)
         return Response(

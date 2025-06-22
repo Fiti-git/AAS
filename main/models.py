@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     employee_id = models.AutoField(primary_key=True)
+    empcode =  models.CharField(max_length=20, null=True)
     fullname = models.CharField(max_length=255)
     phone_number = models.CharField(max_length=20, null=True, blank=True)
     profile_photo = models.URLField(null=True, blank=True)

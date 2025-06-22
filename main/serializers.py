@@ -75,6 +75,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         fields = [
             'employee_id',
             'fullname',
+            'empcode',
             'phone_number',
             'profile_photo',
             'date_of_birth',

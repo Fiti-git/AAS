@@ -71,6 +71,7 @@ def create_employee(request):
     
     fullname = data.get('fullname')
     email = data.get('email')
+    empcode = data.get('empcode')
     phone_number = data.get('phone_number', '')
     outlet_ids = request.data.getlist('outlets')
     date_of_birth = data.get('date_of_birth')
@@ -107,6 +108,7 @@ def create_employee(request):
     # Create employee (without outlets)
     employee = Employee.objects.create(
         user=user,
+        empcode=empcode,
         fullname=fullname,
         phone_number=phone_number,
         profile_photo=profile_photo,
