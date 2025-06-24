@@ -368,6 +368,7 @@ def pending_leave_requests(request):
         remaining = max(allowed - used_count, 0)
 
         result.append({
+            'id': leave_type.id,
             'leave_type': leave_type.att_type_name,
             'leave_code': leave_type.att_type,
             'allowed': allowed,

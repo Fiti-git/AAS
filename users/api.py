@@ -78,7 +78,7 @@ class RegisterDeviceAPIView(APIView):
         return Response({
             "detail": "Device registered successfully.",
             "device_registered": True
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_200_OK)
 
 
 class GetDeviceAPIView(APIView):
