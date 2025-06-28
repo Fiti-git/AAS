@@ -68,19 +68,31 @@ def get_outlet_employees(request):
 @api_view(['POST'])
 def create_employee(request):
     data = request.data
-    
+
     fullname = data.get('fullname')
     email = data.get('email')
     empcode = data.get('empcode')
     phone_number = data.get('phone_number', '')
-    outlet_ids = request.data.getlist('outlets')
+    outlet_ids = data.getlist('outlets') if hasattr(data, 'getlist') else data.get('outlets', [])
     date_of_birth = data.get('date_of_birth')
     profile_photo = data.get('profile_photo', '')
     password = data.get('password')
     username = data.get('fullname')  # Or some unique username logic
-    first_name = data.get('first_name')
-    last_name = data.get('last_name')
+    first_name = data.get('first_name', '')
+    last_name = data.get('last_name', '')
     group_id = data.get('group', '')
+
+    # New fields
+    cal_epf = data.get('cal_epf', True)
+    epf_cal_date = data.get('epf_cal_date')
+    epf_grade = data.get('epf_grade')
+    epf_number = data.get('epf_number')
+    employ_number = data.get('employ_number')
+    basic_salary = data.get('basic_salary')
+    epf_com_per = data.get('epf_com_per', 8.0)
+    epf_emp_per = data.get('epf_emp_per', 5.0)
+    etf_com_per = data.get('etf_com_per', 3.0)
+    idnumber = data.get('idnumber')
 
     # Basic validations (add more as needed)
     if not all([fullname, email, password, date_of_birth]):
@@ -106,22 +118,37 @@ def create_employee(request):
             return Response({'error': 'Group not found'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Create employee (without outlets)
-    employee = Employee.objects.create(
-        user=user,
-        empcode=empcode,
-        fullname=fullname,
-        phone_number=phone_number,
-        profile_photo=profile_photo,
-        date_of_birth=date_of_birth,
-    )
+    try:
+        employee = Employee.objects.create(
+            user=user,
+            empcode=empcode,
+            fullname=fullname,
+            phone_number=phone_number,
+            profile_photo=profile_photo,
+            date_of_birth=date_of_birth,
+            cal_epf=cal_epf,
+            epf_cal_date=epf_cal_date,
+            epf_grade=epf_grade,
+            epf_number=epf_number,
+            employ_number=employ_number,
+            basic_salary=basic_salary,
+            epf_com_per=epf_com_per,
+            epf_emp_per=epf_emp_per,
+            etf_com_per=etf_com_per,
+            idnumber=idnumber,
+        )
+    except Exception as e:
+        user.delete()  # rollback user creation if employee fails
+        return Response({'error': f'Error creating employee: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Assign outlets (many-to-many)
     if outlet_ids:
         if not isinstance(outlet_ids, list):
             outlet_ids = [outlet_ids]
-        # Validate outlets exist
         valid_outlets = Outlet.objects.filter(id__in=outlet_ids)
         if valid_outlets.count() != len(outlet_ids):
+            employee.delete()
+            user.delete()
             return Response({'error': 'One or more outlets not found'}, status=status.HTTP_400_BAD_REQUEST)
         employee.outlets.set(valid_outlets)
 
@@ -157,9 +184,8 @@ def edit_employee(request, employee_id):
                     is_active = False
                 else:
                     # Optionally handle invalid strings here
-                    is_active = False  # or raise an error
+                    return Response({'error': 'Invalid value for is_active.'}, status=status.HTTP_400_BAD_REQUEST)
             user.is_active = is_active
-
 
         # Optionally update group
         group_id = data.get('group', None)
@@ -175,18 +201,73 @@ def edit_employee(request, employee_id):
 
         # Update Employee model fields
         employee.fullname = data.get('fullname', employee.fullname)
+        employee.empcode = data.get('empcode', employee.empcode)
         employee.phone_number = data.get('phone_number', employee.phone_number)
         employee.profile_photo = data.get('profile_photo', employee.profile_photo)
         employee.date_of_birth = data.get('date_of_birth', employee.date_of_birth)
-        outlet_ids = request.data.getlist('outlets')
-        if outlet_ids:
+        employee.cal_epf = data.get('cal_epf', employee.cal_epf)
+
+        # Parse epf_cal_date if provided, else keep existing
+        epf_cal_date = data.get('epf_cal_date', None)
+        if epf_cal_date is not None:
+            employee.epf_cal_date = epf_cal_date
+
+        employee.epf_grade = data.get('epf_grade', employee.epf_grade)
+        employee.epf_number = data.get('epf_number', employee.epf_number)
+
+        # For integer fields, convert if possible
+        employ_number = data.get('employ_number', None)
+        if employ_number is not None:
+            try:
+                employee.employ_number = int(employ_number)
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid employ_number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        idnumber = data.get('idnumber', None)
+        if idnumber is not None:
+            try:
+                employee.idnumber = int(idnumber)
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid idnumber.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # For float fields, convert if possible
+        def to_float(value, field_name):
+            if value is None:
+                return None
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                raise ValueError(f"Invalid value for {field_name}")
+
+        try:
+            epf_com_per = data.get('epf_com_per', employee.epf_com_per)
+            epf_emp_per = data.get('epf_emp_per', employee.epf_emp_per)
+            etf_com_per = data.get('etf_com_per', employee.etf_com_per)
+
+            employee.epf_com_per = to_float(epf_com_per, 'epf_com_per')
+            employee.epf_emp_per = to_float(epf_emp_per, 'epf_emp_per')
+            employee.etf_com_per = to_float(etf_com_per, 'etf_com_per')
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Handle outlets (many-to-many)
+        outlet_ids = None
+        if hasattr(data, 'getlist'):
+            outlet_ids = data.getlist('outlets')
+        else:
+            outlet_ids = data.get('outlets', None)
+
+        if outlet_ids is not None:
             if not isinstance(outlet_ids, list):
                 outlet_ids = [outlet_ids]
+
             valid_outlets = Outlet.objects.filter(id__in=outlet_ids)
+            if valid_outlets.count() != len(outlet_ids):
+                return Response({'error': 'One or more outlets not found'}, status=status.HTTP_400_BAD_REQUEST)
+
             employee.outlets.set(valid_outlets)
 
         employee.save()
-
 
         return Response({'message': 'Employee updated successfully.'}, status=status.HTTP_200_OK)
 
@@ -467,3 +548,20 @@ def jwt_login_view(request):
 # View to render the employee creation form
 def loginform_form(request):
     return render(request, 'login.html')  # Path to the HTML file
+
+@api_view(['POST'])
+def create_role(request):
+    """
+    API to create a new role (Django Group)
+    Example payload: { "name": "Teacher" }
+    """
+    role_name = request.data.get('name', '').strip()
+    
+    if not role_name:
+        return Response({"error": "Role name is required."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if Group.objects.filter(name=role_name).exists():
+        return Response({"error": "Role already exists."}, status=status.HTTP_409_CONFLICT)
+    
+    Group.objects.create(name=role_name)
+    return Response({"message": f"Role '{role_name}' created successfully."}, status=status.HTTP_201_CREATED)
