@@ -1,6 +1,6 @@
 # AAS Django Project
 
-This is a Django-based web application.
+This is a Django-based web application Nice.
 
 ## Setup
 
