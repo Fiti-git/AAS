@@ -42,7 +42,7 @@ def punch_in(request):
 
         if not verify_location(employee, check_in_lat, check_in_long):
             return Response(
-                {"error": "You're not at an allowed location for punch-in", "lat":check_in_lat , "lon":check_in_long},
+                {"error": "You're not at an allowed location for punch-in", "lat":check_in_lat , "lon":check_in_long, "employee": employee},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
