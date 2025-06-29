@@ -91,10 +91,10 @@ def create_employee(request):
     employ_number = data.get('employ_number')
     basic_salary = data.get('basic_salary', None)
     if basic_salary in [None, '', 'null']:
-        employee.basic_salary = None
+        basic_salary = None
     else:
         try:
-            employee.basic_salary = float(basic_salary)
+            basic_salary = float(basic_salary)
         except (ValueError, TypeError):
             return Response({'error': 'Invalid value for basic_salary.'}, status=status.HTTP_400_BAD_REQUEST)
     epf_com_per = data.get('epf_com_per', 8.0)
