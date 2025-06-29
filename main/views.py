@@ -89,7 +89,14 @@ def create_employee(request):
     epf_grade = data.get('epf_grade')
     epf_number = data.get('epf_number')
     employ_number = data.get('employ_number')
-    basic_salary = data.get('basic_salary')
+    basic_salary = data.get('basic_salary', None)
+    if basic_salary in [None, '', 'null']:
+        employee.basic_salary = None
+    else:
+        try:
+            employee.basic_salary = float(basic_salary)
+        except (ValueError, TypeError):
+            return Response({'error': 'Invalid value for basic_salary.'}, status=status.HTTP_400_BAD_REQUEST)
     epf_com_per = data.get('epf_com_per', 8.0)
     epf_emp_per = data.get('epf_emp_per', 5.0)
     etf_com_per = data.get('etf_com_per', 3.0)
@@ -232,6 +239,15 @@ def edit_employee(request, employee_id):
                 employee.idnumber = int(idnumber)
             except (ValueError, TypeError):
                 return Response({'error': 'Invalid idnumber.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        basic_salary = data.get('basic_salary', None)
+        if basic_salary in [None, '', 'null']:
+            employee.basic_salary = None
+        else:
+            try:
+                employee.basic_salary = float(basic_salary)
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid value for basic_salary.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # For float fields, convert if possible
         def to_float(value, field_name):
