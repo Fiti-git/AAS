@@ -12,17 +12,15 @@ def haversine(lat1, lon1, lat2, lon2):
 
 def verify_location(employee, lat, lon):
     try:
-        for outlet_id in employee.outlet:
-            outlet = Outlet.objects.get(id=outlet_id)
-            
+        for outlet in employee.outlets.all():
             # Calculate the distance using the haversine formula
             distance = haversine(lat, lon, outlet.latitude, outlet.longitude)
             
             # If within the radius of any outlet, location is verified
             if distance <= outlet.radius_meters:
                 return True
-        
-        # If no outlet is within range, return False
+        return False
+    except Exception as e:
         return False
 
     except (Outlet.DoesNotExist, TypeError, AttributeError) as e:
