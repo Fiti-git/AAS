@@ -84,6 +84,7 @@ def create_employee(request):
 
     # New fields
     cal_epf = data.get('cal_epf', True)
+    cal_epf = str(cal_epf).lower() == 'true'
     epf_cal_date = data.get('epf_cal_date')
     epf_grade = data.get('epf_grade')
     epf_number = data.get('epf_number')
@@ -205,7 +206,9 @@ def edit_employee(request, employee_id):
         employee.phone_number = data.get('phone_number', employee.phone_number)
         employee.profile_photo = data.get('profile_photo', employee.profile_photo)
         employee.date_of_birth = data.get('date_of_birth', employee.date_of_birth)
-        employee.cal_epf = data.get('cal_epf', employee.cal_epf)
+        cal_raw_value = data.get('cal_epf')
+        if cal_raw_value is not None:
+            employee.cal_epf = str(cal_raw_value).lower() == 'true'
 
         # Parse epf_cal_date if provided, else keep existing
         epf_cal_date = data.get('epf_cal_date', None)

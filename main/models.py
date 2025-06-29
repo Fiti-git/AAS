@@ -9,7 +9,7 @@ class Employee(models.Model):
     employee_id = models.AutoField(primary_key=True)
     empcode =  models.CharField(max_length=20, null=True)
     fullname = models.CharField(max_length=255)
-    idnumber = models.BigIntegerField( null=True, blank=True)
+    idnumber = models.CharField(max_length=20, null=True, blank=True)
     phone_number = models.CharField(max_length=20, null=True, blank=True)
     profile_photo = models.URLField(null=True, blank=True)
     date_of_birth = models.DateField()
