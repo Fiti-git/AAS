@@ -59,16 +59,16 @@ pipeline {
         stage('Run Migrations') {
             steps {
                 script {
-                    // Wait to ensure the containers are running before attempting migrations
-                    echo "Waiting for containers to be fully ready..."
-                    sh 'sleep 10'  // You can adjust this time depending on the stability of your containers
+                    // Wait for the web container to be up and running
+                    echo "Waiting for web container to be ready..."
+                    sh "docker-compose -f docker-compose.yml exec -T web wait-for-it.sh db:5432 --timeout=60 --strict -- echo 'db is up and running'"
 
-                    // Run Django migrations
                     echo "Running Django migrations..."
                     sh "$DOCKER_COMPOSE_CMD exec -T web python manage.py migrate --noinput"
                 }
             }
         }
+
 
         stage('Check Containers') {
             steps {
