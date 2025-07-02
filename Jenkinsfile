@@ -6,7 +6,7 @@ pipeline {
         DEPLOY_SERVER = 'root@159.65.254.186'  // The IP address of your server
         DEPLOY_PATH = '/root/AAS'               // Path to deploy on the server
         GIT_REPO = 'https://github.com/Fiti-git/AAS.git' // Your GitHub repository
-        SSH_KEY_ID = 'vps-ssh-key'             // Jenkins credential ID for SSH key
+        SSH_KEY_ID = 'vps-ssh-key'             // The ID of your Jenkins credentials
     }
 
     stages {
@@ -33,8 +33,8 @@ pipeline {
         stage('Deploy to VPS') {
             steps {
                 script {
-                    // Use SSH to deploy the app with the credentials from Jenkins
-                    sshagent(credentials: [SSH_KEY_ID]) {
+                    // Use SSH to deploy the application
+                    sshagent([SSH_KEY_ID]) {
                         sh """
                         ssh -o StrictHostKeyChecking=no ${DEPLOY_SERVER} "
                             cd ${DEPLOY_PATH} && 
@@ -49,12 +49,10 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 script {
-                    // Verify the deployment on the VPS
-                    sshagent(credentials: [SSH_KEY_ID]) {
-                        sh """
-                        ssh ${DEPLOY_SERVER} 'docker ps'
-                        """
-                    }
+                    // Add some commands to verify if the deployment was successful
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${DEPLOY_SERVER} 'docker ps'
+                    """
                 }
             }
         }
