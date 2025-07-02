@@ -15,6 +15,16 @@ pipeline {
             }
         }
 
+        stage('Stop Containers') {
+            steps {
+                script {
+                    // Stop and remove any running containers before starting fresh
+                    echo "Stopping and removing any existing containers..."
+                    sh "$DOCKER_COMPOSE_CMD down"
+                }
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 script {
@@ -44,7 +54,6 @@ pipeline {
                 }
             }
         }
-
 
         stage('Check Containers') {
             steps {
