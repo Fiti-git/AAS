@@ -15,12 +15,14 @@ pipeline {
             }
         }
 
-        stage('Stop Containers') {
+        stage('Stop Existing Containers') {
             steps {
                 script {
-                    // Stop and remove any running containers before starting fresh
+                    // Stop and remove any existing containers
                     echo "Stopping and removing any existing containers..."
-                    sh "$DOCKER_COMPOSE_CMD down"
+                    sh 'docker-compose -f docker-compose.yml down || true'
+                    sh 'docker ps -q --filter "name=aas_db" | xargs -r docker stop' // Stop the db container if it's running
+                    sh 'docker ps -q --filter "name=aas_db" | xargs -r docker rm'   // Remove the db container if it's stopped
                 }
             }
         }
