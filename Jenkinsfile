@@ -20,15 +20,14 @@ pipeline {
                 script {
                     // Stop and remove any existing containers
                     echo "Stopping and removing any existing containers..."
-                    sh 'docker-compose -f docker-compose.yml down || true'
-                    
-                    // Explicitly stop containers holding onto ports 5432, 5050, 8000
-                    sh 'docker ps -q --filter "name=aas_db" | xargs -r docker stop'
-                    sh 'docker ps -q --filter "name=aas_db" | xargs -r docker rm'
-                    sh 'docker ps -q --filter "name=pgadmin" | xargs -r docker stop'
-                    sh 'docker ps -q --filter "name=pgadmin" | xargs -r docker rm'
-                    sh 'docker ps -q --filter "name=web" | xargs -r docker stop'
-                    sh 'docker ps -q --filter "name=web" | xargs -r docker rm'
+                    sh "$DOCKER_COMPOSE_CMD down"
+                    // Ensure any lingering containers are also stopped and removed
+                    sh 'docker ps -q --filter name=aas_db | xargs -r docker stop'
+                    sh 'docker ps -q --filter name=pgadmin | xargs -r docker stop'
+                    sh 'docker ps -q --filter name=web | xargs -r docker stop'
+                    sh 'docker ps -q --filter name=aas_db | xargs -r docker rm'
+                    sh 'docker ps -q --filter name=pgadmin | xargs -r docker rm'
+                    sh 'docker ps -q --filter name=web | xargs -r docker rm'
                 }
             }
         }
@@ -46,8 +45,12 @@ pipeline {
         stage('Run Docker Container') {
             steps {
                 script {
-                    // Run the container for Django
-                    echo "Starting Django container..."
+                    // Wait for a few seconds to allow any processes to stabilize before starting the containers
+                    echo "Waiting for containers to stabilize..."
+                    sh 'sleep 10' // Adjust time if needed
+
+                    // Start the containers
+                    echo "Starting containers..."
                     sh "$DOCKER_COMPOSE_CMD up -d"
                 }
             }
@@ -56,6 +59,10 @@ pipeline {
         stage('Run Migrations') {
             steps {
                 script {
+                    // Wait to ensure the containers are running before attempting migrations
+                    echo "Waiting for containers to be fully ready..."
+                    sh 'sleep 10'  // You can adjust this time depending on the stability of your containers
+
                     // Run Django migrations
                     echo "Running Django migrations..."
                     sh "$DOCKER_COMPOSE_CMD exec -T web python manage.py migrate --noinput"
@@ -66,7 +73,7 @@ pipeline {
         stage('Check Containers') {
             steps {
                 script {
-                    // Verify that the container is running
+                    // Verify that the containers are running
                     echo "Checking running containers..."
                     sh 'docker ps'
                 }
@@ -77,7 +84,7 @@ pipeline {
     post {
         always {
             echo "Cleaning up workspace..."
-            cleanWs() // Clean up workspace after build
+            cleanWs() // Clean up workspace after the build
         }
 
         success {
