@@ -10,7 +10,8 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/Fiti-git/AAS.git'
+                // Checkout from the 'main' branch explicitly
+                git branch: 'main', url: 'https://github.com/Fiti-git/AAS.git'
             }
         }
 
