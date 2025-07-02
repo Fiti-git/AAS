@@ -7,7 +7,7 @@ WORKDIR /aas
 RUN apt-get update && apt-get install -y libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file and install Python dependencies
-COPY requirements.txt /app/
+COPY requirements.txt /requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy all application files into the container
