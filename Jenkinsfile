@@ -6,7 +6,7 @@ pipeline {
         DEPLOY_SERVER = 'root@159.65.254.186'  // The IP address of your server
         DEPLOY_PATH = '/root/AAS'               // Path to deploy on the server
         GIT_REPO = 'https://github.com/Fiti-git/AAS.git' // Your GitHub repository
-        SSH_KEY_PATH = '/root/.ssh/id_rsa'      // Path to your private SSH key
+        SSH_KEY_ID = 'vps-ssh-key'             // Jenkins credential ID for SSH key
     }
 
     stages {
@@ -33,13 +33,15 @@ pipeline {
         stage('Deploy to VPS') {
             steps {
                 script {
-                    // Use SSH to copy the docker-compose file and deploy the app
-                    sh """
-                    ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ${DEPLOY_SERVER} "
-                        cd ${DEPLOY_PATH} && 
-                        docker-compose down && 
-                        docker-compose up -d --build"
-                    """
+                    // Use SSH to deploy the app with the credentials from Jenkins
+                    sshagent(credentials: [SSH_KEY_ID]) {
+                        sh """
+                        ssh -o StrictHostKeyChecking=no ${DEPLOY_SERVER} "
+                            cd ${DEPLOY_PATH} && 
+                            docker-compose down && 
+                            docker-compose up -d --build"
+                        """
+                    }
                 }
             }
         }
@@ -47,10 +49,12 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 script {
-                    // Add some commands to verify if the deployment was successful
-                    sh """
-                    ssh -i ${SSH_KEY_PATH} ${DEPLOY_SERVER} 'docker ps'
-                    """
+                    // Verify the deployment on the VPS
+                    sshagent(credentials: [SSH_KEY_ID]) {
+                        sh """
+                        ssh ${DEPLOY_SERVER} 'docker ps'
+                        """
+                    }
                 }
             }
         }
