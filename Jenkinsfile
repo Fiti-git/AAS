@@ -40,10 +40,11 @@ pipeline {
                 script {
                     // Run Django migrations
                     echo "Running Django migrations..."
-                    sh "$DOCKER_COMPOSE_CMD exec web python manage.py migrate --noinput"
+                    sh "$DOCKER_COMPOSE_CMD exec -T web python manage.py migrate --noinput"
                 }
             }
         }
+
 
         stage('Check Containers') {
             steps {
