@@ -4,6 +4,7 @@ pipeline {
     environment {
         DJANGO_IMAGE = 'django_backend'
         DJANGO_COMPOSE_FILE = 'docker-compose.yml'
+        DOCKER_COMPOSE_CMD = 'docker-compose -f $DJANGO_COMPOSE_FILE'
     }
 
     stages {
@@ -17,7 +18,8 @@ pipeline {
             steps {
                 script {
                     // Build Docker image for Django
-                    sh 'docker-compose -f $DJANGO_COMPOSE_FILE build'
+                    echo "Building Docker image for Django..."
+                    sh "$DOCKER_COMPOSE_CMD build"
                 }
             }
         }
@@ -26,7 +28,8 @@ pipeline {
             steps {
                 script {
                     // Run the container for Django
-                    sh 'docker-compose -f $DJANGO_COMPOSE_FILE up -d'
+                    echo "Starting Django container..."
+                    sh "$DOCKER_COMPOSE_CMD up -d"
                 }
             }
         }
@@ -35,7 +38,8 @@ pipeline {
             steps {
                 script {
                     // Run Django migrations
-                    sh 'docker-compose exec web python manage.py migrate'
+                    echo "Running Django migrations..."
+                    sh "$DOCKER_COMPOSE_CMD exec web python manage.py migrate --noinput"
                 }
             }
         }
@@ -44,6 +48,7 @@ pipeline {
             steps {
                 script {
                     // Verify that the container is running
+                    echo "Checking running containers..."
                     sh 'docker ps'
                 }
             }
@@ -52,7 +57,16 @@ pipeline {
 
     post {
         always {
+            echo "Cleaning up workspace..."
             cleanWs() // Clean up workspace after build
+        }
+
+        success {
+            echo "Pipeline executed successfully!"
+        }
+
+        failure {
+            echo "Pipeline failed!"
         }
     }
 }
