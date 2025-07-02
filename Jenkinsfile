@@ -2,68 +2,57 @@ pipeline {
     agent any
 
     environment {
-        // Define environment variables
-        DEPLOY_SERVER = 'root@159.65.254.186'  // The IP address of your server
-        DEPLOY_PATH = '/root/AAS'               // Path to deploy on the server
-        GIT_REPO = 'https://github.com/Fiti-git/AAS.git' // Your GitHub repository
-        SSH_KEY_ID = 'vps-ssh-key'             // The ID of your Jenkins credentials
+        DJANGO_IMAGE = 'django_backend'
+        DJANGO_COMPOSE_FILE = 'docker-compose.yml'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                script {
-                    // Checkout the latest code from GitHub
-                    git branch: 'main', url: "${GIT_REPO}"
-                }
+                git 'https://github.com/Fiti-git/AAS.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Build the Docker image using the Dockerfile
-                    sh '''
-                    docker build -t aas_web .
-                    '''
+                    // Build Docker image for Django
+                    sh 'docker-compose -f $DJANGO_COMPOSE_FILE build'
                 }
             }
         }
 
-        stage('Deploy to VPS') {
+        stage('Run Docker Container') {
             steps {
                 script {
-                    // Use SSH to deploy the application
-                    sshagent([SSH_KEY_ID]) {
-                        sh """
-                        ssh -o StrictHostKeyChecking=no ${DEPLOY_SERVER} "
-                            cd ${DEPLOY_PATH} && 
-                            docker-compose down && 
-                            docker-compose up -d --build"
-                        """
-                    }
+                    // Run the container for Django
+                    sh 'docker-compose -f $DJANGO_COMPOSE_FILE up -d'
                 }
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Run Migrations') {
             steps {
                 script {
-                    // Add some commands to verify if the deployment was successful
-                    sh """
-                    ssh -o StrictHostKeyChecking=no ${DEPLOY_SERVER} 'docker ps'
-                    """
+                    // Run Django migrations
+                    sh 'docker-compose exec web python manage.py migrate'
+                }
+            }
+        }
+
+        stage('Check Containers') {
+            steps {
+                script {
+                    // Verify that the container is running
+                    sh 'docker ps'
                 }
             }
         }
     }
 
     post {
-        success {
-            echo 'Deployment successful!'
-        }
-        failure {
-            echo 'Deployment failed. Check logs for details.'
+        always {
+            cleanWs() // Clean up workspace after build
         }
     }
 }
