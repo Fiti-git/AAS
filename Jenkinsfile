@@ -21,8 +21,14 @@ pipeline {
                     // Stop and remove any existing containers
                     echo "Stopping and removing any existing containers..."
                     sh 'docker-compose -f docker-compose.yml down || true'
-                    sh 'docker ps -q --filter "name=aas_db" | xargs -r docker stop' // Stop the db container if it's running
-                    sh 'docker ps -q --filter "name=aas_db" | xargs -r docker rm'   // Remove the db container if it's stopped
+                    
+                    // Explicitly stop containers holding onto ports 5432, 5050, 8000
+                    sh 'docker ps -q --filter "name=aas_db" | xargs -r docker stop'
+                    sh 'docker ps -q --filter "name=aas_db" | xargs -r docker rm'
+                    sh 'docker ps -q --filter "name=pgadmin" | xargs -r docker stop'
+                    sh 'docker ps -q --filter "name=pgadmin" | xargs -r docker rm'
+                    sh 'docker ps -q --filter "name=web" | xargs -r docker stop'
+                    sh 'docker ps -q --filter "name=web" | xargs -r docker rm'
                 }
             }
         }
