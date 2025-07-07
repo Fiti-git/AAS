@@ -43,6 +43,9 @@ urlpatterns = [
     # path('api/token/', permission_classes([])(TokenObtainPairView.as_view()), name='token_obtain_pair'),
     path('api/token/', CustomTokenObtainpairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # refresh
+    path('api/devices/', views.get_all_devices, name='get_all_devices'),          # GET all devices
+    path('api/devices/delete/', views.delete_device, name='delete_device'),       # DELETE a device
+    path('api/attendance/all/', views.AllAttendanceRecordsView.as_view(), name='all_attendance_records'),  # GET attendance records
     path('api/attendance/', include('attendance.apiurls')),
     path('attendance/', include('attendance.urls')),
     path('api/users/', include('users.apiurls')),

@@ -1,16 +1,19 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
-from .models import Agency, Employee, Outlet, Role, Holiday , LeaveType
+from .models import Agency, Employee, Outlet, Role, Holiday , LeaveType, Devices, Attendance
 from django.contrib.auth.hashers import make_password
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, generics
 from django.contrib.auth.models import User, Group
-from .serializers import OutletSerializer, EmployeeSerializer, AgencySerializer, HolidaySerializer, LeaveTypeSerializer
+from .serializers import OutletSerializer, EmployeeSerializer, AgencySerializer, HolidaySerializer, LeaveTypeSerializer, AttendanceSerializer
 from django.shortcuts import render
 from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
+from datetime import datetime
+from rest_framework.exceptions import ValidationError, PermissionDenied
+from django.db.models import Q
 
 
 def home(request):
@@ -584,3 +587,110 @@ def create_role(request):
     
     Group.objects.create(name=role_name)
     return Response({"message": f"Role '{role_name}' created successfully."}, status=status.HTTP_201_CREATED)
+
+# GET Device API
+@api_view(['GET'])
+def get_all_devices(request):
+    devices = Devices.objects.all()
+
+    device_list = []
+    for device in devices:
+        user = device.user
+        employee = getattr(user, 'employee', None)
+
+        device_list.append({
+            "device_id": device.device_id,
+            "device_type": device.device_type,
+            "registered_at": device.registered_at,
+            "employee_id": employee.employee_id if employee else None,
+            "empcode": employee.empcode if employee else None,
+            "fullname": employee.fullname if employee else user.username if user else None,
+        })
+
+    return Response(device_list, status=status.HTTP_200_OK)
+
+# DELETE Device API
+@api_view(['DELETE'])
+def delete_device(request):
+    device_id = request.data.get('device_id')
+    
+    if not device_id:
+        return Response({"error": "device_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        device = Devices.objects.get(device_id=device_id)
+        device.delete()
+        return Response({"message": "Device deleted successfully."}, status=status.HTTP_200_OK)
+    except Devices.DoesNotExist:
+        return Response({"error": "Device not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+class AllAttendanceRecordsView(generics.ListAPIView):
+    serializer_class = AttendanceSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        base_queryset = Attendance.objects.select_related('employee')
+        outlet_id_str = self.request.query_params.get('outlet_id')
+        queryset = None  # define early
+
+        # --- Admin: access to all attendance records ---
+        if user.is_staff:
+            queryset = base_queryset.all()
+            if outlet_id_str and outlet_id_str != '0':
+                queryset = queryset.filter(employee__outlets__id=outlet_id_str)
+
+        # --- Manager: access to records only in their outlets ---
+        elif user.groups.filter(name="Manager").exists():
+            try:
+                manager_outlets = user.employee.outlets.all()
+                if not manager_outlets.exists():
+                    return Attendance.objects.none()
+
+                queryset = base_queryset.filter(employee__outlets__in=manager_outlets)
+
+                # Manager can only filter within their own outlets
+                if outlet_id_str and outlet_id_str != '0':
+                    queryset = queryset.filter(employee__outlets__id=outlet_id_str, employee__outlets__in=manager_outlets)
+
+            except Employee.DoesNotExist:
+                return Attendance.objects.none()
+
+        # --- Others: not allowed ---
+        else:
+            raise PermissionDenied({"detail": "You do not have permission to access this data."})
+
+        # --- Optional Filters ---
+        start_date_str = self.request.query_params.get('start_date')
+        end_date_str = self.request.query_params.get('end_date')
+        status_filter = self.request.query_params.get('status')
+        verified_filter = self.request.query_params.get('verified')
+        employee_id = self.request.query_params.get('employee_id')
+        search_query = self.request.query_params.get('search')
+
+        # Validate dates
+        try:
+            if start_date_str:
+                datetime.strptime(start_date_str, '%Y-%m-%d')
+                queryset = queryset.filter(date__gte=start_date_str)
+            if end_date_str:
+                datetime.strptime(end_date_str, '%Y-%m-%d')
+                queryset = queryset.filter(date__lte=end_date_str)
+        except ValueError:
+            raise ValidationError(
+                {"detail": "Invalid date format. Use YYYY-MM-DD."},
+                code=status.HTTP_400_BAD_REQUEST
+            )
+
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if verified_filter:
+            queryset = queryset.filter(verified=verified_filter)
+        if employee_id:
+            queryset = queryset.filter(employee_id=employee_id)
+        if search_query:
+            queryset = queryset.filter(
+                Q(employee__fullname__icontains=search_query) |
+                Q(employee__empcode__icontains=search_query)
+            )
+
+        return queryset.distinct() if queryset is not None else Attendance.objects.none()
