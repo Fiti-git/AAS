@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   db:
     image: postgres:15
@@ -8,7 +10,6 @@ services:
       POSTGRES_PASSWORD: secure_password123
     volumes:
       - aas_pgdata:/var/lib/postgresql/data
-      
     ports:
       - "5432:5432"
 
@@ -41,6 +42,7 @@ services:
       - DATABASE_HOST=db
       - DATABASE_PORT=5432
     restart: always
+
 volumes:
   aas_pgdata:
   pgadmin_data:

@@ -1,59 +1,98 @@
 pipeline {
     agent any
 
+    environment {
+        DJANGO_IMAGE = 'django_backend'
+        DJANGO_COMPOSE_FILE = 'docker-compose.yml'
+        DOCKER_COMPOSE_CMD = 'docker-compose -f $DJANGO_COMPOSE_FILE'
+    }
+
     stages {
-        stage('Clone Repo') {
+        stage('Checkout') {
             steps {
+                // Checkout from the 'main' branch explicitly
                 git branch: 'main', url: 'https://github.com/Fiti-git/AAS.git'
+            }
+        }
+
+        stage('Stop Existing Containers') {
+            steps {
+                script {
+                    // Stop and remove any existing containers
+                    echo "Stopping and removing any existing containers..."
+                    sh "$DOCKER_COMPOSE_CMD down"
+                    // Ensure any lingering containers are also stopped and removed
+                    sh 'docker ps -q --filter name=aas_db | xargs -r docker stop'
+                    sh 'docker ps -q --filter name=pgadmin | xargs -r docker stop'
+                    sh 'docker ps -q --filter name=web | xargs -r docker stop'
+                    sh 'docker ps -q --filter name=aas_db | xargs -r docker rm'
+                    sh 'docker ps -q --filter name=pgadmin | xargs -r docker rm'
+                    sh 'docker ps -q --filter name=web | xargs -r docker rm'
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo "Skipping docker build on Jenkins, build will run on VPS."
-                // if your jenkins server has docker, you can uncomment this line to build locally
-                // sh 'docker build -t aas_django_app . || echo "Skipping docker build on Jenkins"'
-            }
-        }
-
-        stage('Deploy on VPS') {
-            steps {
-                sshagent(['3d42b9b2-6283-468e-9eca-7bcb797b8b2f']) {
-                    sh '''
-                    ssh -o StrictHostKeyChecking=no root@139.59.243.2 "
-                    cd /home/AAS &&
-                    git pull origin main &&
-                    docker-compose down &&
-                    docker-compose up -d --build &&
-                    sleep 10 &&
-                    docker-compose exec web python manage.py makemigrations --noinput &&
-                    docker-compose exec web python manage.py migrate --noinput &&
-                    docker-compose ps
-                    "
-                    '''
+                script {
+                    // Build Docker image for Django
+                    echo "Building Docker image for Django..."
+                    sh "$DOCKER_COMPOSE_CMD build"
                 }
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Run Docker Container') {
             steps {
-                sshagent(['3d42b9b2-6283-468e-9eca-7bcb797b8b2f']) {
-                    sh '''
-                    ssh -o StrictHostKeyChecking=no root@139.59.243.2 "
-                    curl -f http://localhost:8000 || echo 'App not responding'
-                    "
-                    '''
+                script {
+                    // Wait for a few seconds to allow any processes to stabilize before starting the containers
+                    echo "Waiting for containers to stabilize..."
+                    sh 'sleep 10' // Adjust time if needed
+
+                    // Start the containers
+                    echo "Starting containers..."
+                    sh "$DOCKER_COMPOSE_CMD up -d"
+                }
+            }
+        }
+
+        stage('Run Migrations') {
+            steps {
+                script {
+                    // Wait for the web container to be up and running
+                    echo "Waiting for web container to be ready..."
+                    sh "docker-compose -f docker-compose.yml exec -T web wait-for-it.sh db:5432 --timeout=60 --strict -- echo 'db is up and running'"
+
+                    echo "Running Django migrations..."
+                    sh "$DOCKER_COMPOSE_CMD exec -T web python manage.py migrate --noinput"
+                }
+            }
+        }
+
+
+        stage('Check Containers') {
+            steps {
+                script {
+                    // Verify that the containers are running
+                    echo "Checking running containers..."
+                    sh 'docker ps'
                 }
             }
         }
     }
 
     post {
-        success {
-            echo 'Deployment successful! 🎉'
+        always {
+            echo "Cleaning up workspace..."
+            cleanWs() // Clean up workspace after the build
         }
+
+        success {
+            echo "Pipeline executed successfully!"
+        }
+
         failure {
-            echo 'Deployment failed. Check logs!'
+            echo "Pipeline failed!"
         }
     }
 }
