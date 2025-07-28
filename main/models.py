@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User, Group
 import uuid
 from django.core.exceptions import ValidationError
+import os
 
 # Employee Model
 class Employee(models.Model):
@@ -25,9 +26,28 @@ class Employee(models.Model):
     etf_com_per = models.FloatField(default=3.0, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    face_recognition_enabled = models.BooleanField(default=False)
+    training_images_count = models.IntegerField(default=0)
     
     def __str__(self):
         return self.fullname
+    
+    def can_collect_training_image(self):
+        return self.training_images_count < 10 and not self.face_recognition_enabled
+    
+def training_image_upload_path(instance, filename):
+    return os.path.join('training_images', str(instance.employee.employee_id), filename)
+
+class EmployeeTrainingImage(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='training_images')
+    image = models.ImageField(upload_to=training_image_upload_path)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"Training image for {self.employee.fullname} - {self.created_at}"
 
 # Attendance Model
 class Attendance(models.Model):

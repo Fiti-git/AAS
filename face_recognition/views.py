@@ -58,8 +58,7 @@ def verify_selfie(photo_file, employee):
     try:
         label, message = verify_employee(temp_path, saved_embeddings, labels)
         if label and (
-            str(label).lower() == str(employee.employee_id).lower()
-            or str(label).lower() == employee.fullname.lower()
+            str(label).lower() == str(employee.employee_id)
         ):
             return {"success": True, "message": message}
         else:

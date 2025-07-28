@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday
+from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday, EmployeeTrainingImage
 from django.utils import timezone
 from main.serializers import EmpLeaveSerializer, HolidaySerializer, AttendanceSerializer
 from django.db.models import Q
@@ -23,7 +23,7 @@ def punch_in(request):
         employee = request.user.employee
         data = request.data
 
-        required_fields = ['check_in_lat', 'check_in_long', 'authorized']
+        required_fields = ['check_in_lat', 'check_in_long']
         if not all(field in data or field in request.FILES for field in required_fields):
             return Response(
                 {"error": "Missing required fields: check_in_lat, check_in_long, photo_check_in, authorized"},
@@ -48,16 +48,47 @@ def punch_in(request):
 
         verified_status = 'Pending'
         selfie_message = None
+        photo_path = None
 
         if authorized:
             verified_status = 'Verified'
         else:
             photo_file = request.FILES.get('photo_check_in')
-            verification_result = verify_selfie(photo_file, employee)
-            if verification_result['success']:
-                verified_status = 'Verified'
+            if not photo_file:
+                return Response(
+                    {"error": "Photo is required for punch-in"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if face recognition is enabled for this employee
+            if employee.face_recognition_enabled:
+                # Use existing face recognition verification
+                verification_result = verify_selfie(photo_file, employee)
+                if verification_result['success']:
+                    verified_status = 'Verified'
+                else:
+                    selfie_message = f"Face recognition failed: {verification_result['message']}"
             else:
-                selfie_message = f"Selfie not verified: {verification_result['message']}"
+                # Check if we can still collect training images
+                if employee.can_collect_training_image():
+                    # Save image for training
+                    training_image_saved = save_training_image(photo_file, employee)
+                    if training_image_saved:
+                        selfie_message = f"Training image saved. {employee.training_images_count}/10 images collected."
+                    else:
+                        selfie_message = "Failed to save training image."
+                else:
+                    selfie_message = "Maximum training images reached."
+
+                # For now, use the old verification method or set as pending
+                verification_result = verify_selfie(photo_file, employee)
+                if verification_result['success']:
+                    verified_status = 'Verified'
+                else:
+                    if selfie_message:
+                        selfie_message += f" Fallback verification: {verification_result['message']}"
+                    else:
+                        selfie_message = f"Verification failed: {verification_result['message']}"
 
         attendance = Attendance.objects.create(
             employee=employee,
@@ -65,13 +96,18 @@ def punch_in(request):
             check_in_time=timezone.now(),
             check_in_lat=check_in_lat,
             check_in_long=check_in_long,
-            photo_check_in='sample',  # Replace this later with file path
+            photo_check_in='sample',
             verified=verified_status
         )
 
         response_data = {
             "message": "Punch-in recorded successfully!",
-            "data": AttendanceSerializer(attendance).data
+            "data": AttendanceSerializer(attendance).data,
+            "face_recognition_status": {
+                "enabled": employee.face_recognition_enabled,
+                "training_images_count": employee.training_images_count,
+                "training_complete": employee.training_images_count >= 10
+            }
         }
 
         if selfie_message:
@@ -85,6 +121,24 @@ def punch_in(request):
             {"error": "An error occurred during punch-in"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+def save_training_image(photo_file, employee):
+    """Save training image for face recognition model"""
+    try:
+        # Create training image record
+        training_image = EmployeeTrainingImage.objects.create(
+            employee=employee,
+            image=photo_file
+        )
+        
+        # Update training images count
+        employee.training_images_count = employee.training_images.count()
+        employee.save()
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error saving training image: {str(e)}")
+        return False
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
