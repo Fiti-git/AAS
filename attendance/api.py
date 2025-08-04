@@ -11,6 +11,7 @@ from main.utils import verify_location
 from face_recognition.views import verify_selfie
 import logging
 from rest_framework.views import APIView
+from attendance.utils import simple_detect_and_crop_face
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +60,15 @@ def punch_in(request):
                     {"error": "Photo is required for punch-in"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            cropped_photo, error_msg = simple_detect_and_crop_face(photo_file)
+            # --- HANDLE THE ERROR ---
+            if error_msg:
+                return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
             # Check if face recognition is enabled for this employee
             if employee.face_recognition_enabled:
                 # Use existing face recognition verification
-                verification_result = verify_selfie(photo_file, employee)
+                verification_result = verify_selfie(cropped_photo, employee)
                 if verification_result['success']:
                     verified_status = 'Verified'
                 else:
@@ -72,7 +77,7 @@ def punch_in(request):
                 # Check if we can still collect training images
                 if employee.can_collect_training_image():
                     # Save image for training
-                    training_image_saved = save_training_image(photo_file, employee)
+                    training_image_saved = save_training_image(cropped_photo, employee)
                     if training_image_saved:
                         selfie_message = f"Training image saved. {employee.training_images_count}/10 images collected."
                     else:
@@ -81,7 +86,7 @@ def punch_in(request):
                     selfie_message = "Maximum training images reached."
 
                 # For now, use the old verification method or set as pending
-                verification_result = verify_selfie(photo_file, employee)
+                verification_result = verify_selfie(cropped_photo, employee)
                 if verification_result['success']:
                     verified_status = 'Verified'
                 else:

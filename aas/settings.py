@@ -129,4 +129,4 @@ SIMPLE_JWT = {
 # ✅ CORS SETTINGS (development-safe)
 CORS_ALLOW_ALL_ORIGINS = True  # ❗ Enable only in development. Restrict for production.
 
-
+HAARCASCADE_FILE_PATH = BASE_DIR / 'models' / 'haarcascade_frontalface_default.xml'
