@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from rest_framework.response import Response
 from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday, EmployeeTrainingImage
 from django.utils import timezone
@@ -12,6 +12,11 @@ from face_recognition.views import verify_selfie
 import logging
 from rest_framework.views import APIView
 from attendance.utils import simple_detect_and_crop_face
+
+
+from rest_framework.permissions import IsAuthenticated, 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
 
@@ -210,10 +215,6 @@ def punch_out(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
 
 # GET /attendance/me - Get logged-in user's attendance
 @api_view(['GET'])
