@@ -36,11 +36,15 @@ services:
     depends_on:
       - db
     environment:
+      # These are still needed to tell Django where the DB is,
+      # and are loaded into the container's environment before env_file takes precedence for shared names
       - DATABASE_NAME=aas_db
       - DATABASE_USER=aas_user
       - DATABASE_PASSWORD=secure_password123
       - DATABASE_HOST=db
       - DATABASE_PORT=5432
+    env_file:
+      - .env  # <--- This line tells Docker Compose to load variables from .env
     restart: always
 
 volumes:
