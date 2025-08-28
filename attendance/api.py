@@ -37,11 +37,11 @@ def punch_in(request):
         check_in_long = float(data.get('check_in_long'))
         photo_file = request.FILES.get('photo_check_in')
 
-        # if not verify_location(employee, check_in_lat, check_in_long):
-        #     return Response(
-        #         {"error": "You're not at an allowed location for punch-in"},
-        #         status=status.HTTP_400_BAD_REQUEST
-        #     )
+        if not verify_location(employee, check_in_lat, check_in_long):
+            return Response(
+                {"error": "You're not at an allowed location for punch-in"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         verified_status = 'Pending'
         response_message = "Punch-in recorded successfully!"
@@ -132,6 +132,12 @@ def punch_out(request):
         check_out_lat = float(data.get('check_out_lat'))
         check_out_long = float(data.get('check_out_long'))
         photo_file = request.FILES.get('photo_check_out')
+
+        if not verify_location(employee, check_out_lat, check_out_long):
+            return Response(
+                {"error": "You're not at an allowed location for punch-out"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # CORRECTED: Use the new field name
         employee.punchout_selfie = photo_file
