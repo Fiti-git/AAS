@@ -6,7 +6,7 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.core.paginator import Paginator
-from main.models import Employee, EmployeeTrainingImage
+from main.models import Employee
 
 # Create your views here.
 def attendance_page(request):

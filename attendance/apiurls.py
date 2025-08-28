@@ -16,4 +16,5 @@ urlpatterns = [
     path('pendingleave/', api.pending_leave_requests, name='pending_leave_requests'),
     path('updateleavestatus/<int:id>/', api.update_leave_status, name='update_leave_status'),
     path('report/', api.generate_report, name='generate-report'),
+    path('verify/', api.VerifyAttendanceView.as_view(), name='verify-attendance'),
 ]

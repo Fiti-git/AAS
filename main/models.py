@@ -4,7 +4,19 @@ import uuid
 from django.core.exceptions import ValidationError
 import os
 
-# Employee Model
+def reference_photo_upload_path(instance, filename):
+    return os.path.join('reference_photos', str(instance.employee_id), filename)
+
+def punchin_selfie_upload_path(instance, filename):
+    return os.path.join('daily_selfies', str(instance.employee_id), 'punchin', filename)
+
+def punchout_selfie_upload_path(instance, filename):
+    return os.path.join('daily_selfies', str(instance.employee_id), 'punchout', filename)
+
+def attendance_photo_upload_path(instance, filename):
+    date_str = instance.date.strftime('%Y-%m-%d')
+    return os.path.join('attendance_records', str(instance.employee.employee_id), date_str, filename)
+
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     employee_id = models.AutoField(primary_key=True)
@@ -12,7 +24,6 @@ class Employee(models.Model):
     fullname = models.CharField(max_length=255)
     idnumber = models.CharField(max_length=20, null=True, blank=True)
     phone_number = models.CharField(max_length=20, null=True, blank=True)
-    profile_photo = models.URLField(null=True, blank=True)
     date_of_birth = models.DateField()
     outlets = models.ManyToManyField('Outlet', related_name='employees', blank=True)
     cal_epf = models.BooleanField(default=True)
@@ -26,47 +37,51 @@ class Employee(models.Model):
     etf_com_per = models.FloatField(default=3.0, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    face_recognition_enabled = models.BooleanField(default=False)
-    training_images_count = models.IntegerField(default=0)
     
+    reference_photo = models.ImageField(
+        upload_to=reference_photo_upload_path, 
+        null=True, 
+        blank=True
+    )
+    punchin_selfie = models.ImageField(
+        upload_to=punchin_selfie_upload_path, 
+        null=True, 
+        blank=True
+    )
+    punchout_selfie = models.ImageField(
+        upload_to=punchout_selfie_upload_path, 
+        null=True, 
+        blank=True
+    )
+
     def __str__(self):
         return self.fullname
     
-    def can_collect_training_image(self):
-        return self.training_images_count < 10 and not self.face_recognition_enabled
-    
-def training_image_upload_path(instance, filename):
-    return os.path.join('training_images', str(instance.employee.employee_id), filename)
+    def save(self, *args, **kwargs):
+        if self.pk:
+            try:
+                original_instance = Employee.objects.get(pk=self.pk)
+                
+                # CORRECTED: Check and delete old punchin_selfie
+                if original_instance.punchin_selfie and self.punchin_selfie != original_instance.punchin_selfie:
+                    original_instance.punchin_selfie.delete(save=False)
+                
+                # CORRECTED: Check and delete old punchout_selfie
+                if original_instance.punchout_selfie and self.punchout_selfie != original_instance.punchout_selfie:
+                    original_instance.punchout_selfie.delete(save=False)
 
-class EmployeeTrainingImage(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='training_images')
-    image = models.ImageField(upload_to=training_image_upload_path)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        ordering = ['-created_at']
+                # Check if the reference_photo has changed
+                if original_instance.reference_photo and self.reference_photo != original_instance.reference_photo:
+                    original_instance.reference_photo.delete(save=False)
+                    
+            except Employee.DoesNotExist:
+                pass
         
-    def __str__(self):
-        return f"Training image for {self.employee.fullname} - {self.created_at}"
+        super().save(*args, **kwargs)
 
-# Attendance Model
 class Attendance(models.Model):
-    # Status choices
-    STATUS_CHOICES = [
-        ('Present', 'Present'),
-        ('Late', 'Late'),
-        ('Half Day', 'Half Day'),
-        ('Absent', 'Absent'),
-        ('On Leave', 'On Leave'),
-    ]
-    
-    # Verification status choices
-    VERIFICATION_CHOICES = [
-        ('Pending', 'Pending'),
-        ('Verified', 'Verified'),
-        ('Rejected', 'Rejected'),
-        ('Requires Review', 'Requires Review'),
-    ]
+    STATUS_CHOICES = [('Present', 'Present'), ('Late', 'Late'), ('Half Day', 'Half Day'), ('Absent', 'Absent'), ('On Leave', 'On Leave')]
+    VERIFICATION_CHOICES = [('Pending', 'Pending'), ('Verified', 'Verified'), ('Rejected', 'Rejected')]
 
     attendance_id = models.AutoField(primary_key=True)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='attendances')
@@ -74,34 +89,30 @@ class Attendance(models.Model):
     check_in_time = models.DateTimeField()
     check_in_lat = models.FloatField()
     check_in_long = models.FloatField()
-    photo_check_in = models.URLField(max_length=500, null=True, blank=True)
     check_out_time = models.DateTimeField(null=True, blank=True)
     check_out_lat = models.FloatField(null=True, blank=True)
     check_out_long = models.FloatField(null=True, blank=True)
-    photo_check_out = models.URLField(max_length=500, null=True, blank=True)
     worked_hours = models.FloatField(null=True, blank=True)
     ot_hours = models.FloatField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Present')
-    verified = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='Pending')
+    punchin_verification = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='Pending')
+    punchout_verification = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    verification_notes = models.TextField(null=True, blank=True)  # For admin comments
+    verification_notes = models.TextField(null=True, blank=True)
     
     class Meta:
-        unique_together = ('employee', 'date')  # Prevent duplicate entries
+        unique_together = ('employee', 'date')
         ordering = ['-date', 'employee']
-        verbose_name_plural = 'Attendance Records'
     
     def __str__(self):
         return f"{self.employee.fullname} - {self.date} - {self.status}"
     
     def save(self, *args, **kwargs):
-        # Auto-calculate worked hours when punching out
         if self.check_out_time and self.check_in_time:
             delta = self.check_out_time - self.check_in_time
             self.worked_hours = round(delta.total_seconds() / 3600, 2)
-            
-            # Auto-determine status based on worked hours
+
             if self.worked_hours < 4:
                 self.status = 'Half Day'
             elif self.worked_hours > 8:

@@ -10,50 +10,54 @@ class ValidateDeviceAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user
-        device_id = request.data.get("device_id")
+        # user = request.user
+        # device_id = request.data.get("device_id")
 
-        if not device_id:
-            return Response({
-                "detail": "Missing device_id.",
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            registered_device = Devices.objects.get(device_id=device_id)
-        except Devices.DoesNotExist:
-            return Response({
-                "detail": "No personal device registered.",
-                "devicenotregistered": True
-            }, status=status.HTTP_200_OK)
-
-        # Device exists — now check if it belongs to another user
-        if registered_device.user != user:
-            return Response({
-                "detail": "This is not your registered device.",
+        return Response({
                 "alternate": True
             }, status=status.HTTP_200_OK)
 
-        # Check if user has a registered device
-        try:
-            user_device = Devices.objects.get(user=user)
-        except Devices.DoesNotExist:
-            return Response({
-                "detail": "No personal device registered.",
-                "devicenotregistered": True
-            }, status=status.HTTP_200_OK)
+        # if not device_id:
+        #     return Response({
+        #         "detail": "Missing device_id.",
+        #     }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Final verification
-        if user_device.device_id == device_id:
-            return Response({
-                "detail": "Device verified as user device.",
-                "authorized": True
-            }, status=status.HTTP_200_OK)
+        # try:
+        #     registered_device = Devices.objects.get(device_id=device_id)
+        # except Devices.DoesNotExist:
+        #     return Response({
+        #         "detail": "No personal device registered.",
+        #         "devicenotregistered": True
+        #     }, status=status.HTTP_200_OK)
 
-        # Shouldn't reach here, but fallback:
-        return Response({
-            "detail": "This is not your authorized device.",
-            "unauthorized": True
-        }, status=status.HTTP_200_OK)
+        # # Device exists — now check if it belongs to another user
+        # if registered_device.user != user:
+        #     return Response({
+        #         "detail": "This is not your registered device.",
+        #         "alternate": True
+        #     }, status=status.HTTP_200_OK)
+
+        # # Check if user has a registered device
+        # try:
+        #     user_device = Devices.objects.get(user=user)
+        # except Devices.DoesNotExist:
+        #     return Response({
+        #         "detail": "No personal device registered.",
+        #         "devicenotregistered": True
+        #     }, status=status.HTTP_200_OK)
+
+        # # Final verification
+        # if user_device.device_id == device_id:
+        #     return Response({
+        #         "detail": "Device verified as user device.",
+        #         "authorized": True
+        #     }, status=status.HTTP_200_OK)
+
+        # # Shouldn't reach here, but fallback:
+        # return Response({
+        #     "detail": "This is not your authorized device.",
+        #     "unauthorized": True
+        # }, status=status.HTTP_200_OK)
 
 class RegisterDeviceAPIView(APIView):
     permission_classes = [IsAuthenticated]

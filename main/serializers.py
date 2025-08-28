@@ -4,7 +4,9 @@ from .models import Outlet, EmpLeave, Holiday, Attendance, Employee, Agency, Hol
 
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.fullname', read_only=True)
-
+    punchin_selfie_url = serializers.ImageField(source='employee.punchin_selfie', read_only=True)
+    punchout_selfie_url = serializers.ImageField(source='employee.punchout_selfie', read_only=True)
+    
     class Meta:
         model = Attendance
         fields = [
@@ -15,20 +17,25 @@ class AttendanceSerializer(serializers.ModelSerializer):
             'check_in_time',
             'check_in_lat',
             'check_in_long',
-            'photo_check_in',
             'check_out_time',
             'check_out_lat',
             'check_out_long',
-            'photo_check_out',
             'worked_hours',
             'ot_hours',
             'status',
-            'verified',
+            'punchin_verification',
+            'punchout_verification',
             'verification_notes',
             'created_at',
             'updated_at',
+            'punchin_selfie_url',
+            'punchout_selfie_url',
         ]
-        read_only_fields = ['attendance_id', 'worked_hours', 'ot_hours', 'status', 'verified', 'created_at', 'updated_at']
+        read_only_fields = [
+            'attendance_id', 'worked_hours', 'ot_hours', 'status', 
+            'punchin_verification', 'punchout_verification', 
+            'created_at', 'updated_at'
+        ]
 
 
 class OutletSerializer(serializers.ModelSerializer):
@@ -70,6 +77,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(source='user.is_active', read_only=True)
     groups = serializers.SerializerMethodField()
     outlets = serializers.PrimaryKeyRelatedField(queryset=Outlet.objects.all(), many=True)
+
     class Meta:
         model = Employee
         fields = [
@@ -78,7 +86,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'empcode',
             'idnumber',
             'phone_number',
-            'profile_photo',
             'date_of_birth',
             'outlets',
             'cal_epf',
@@ -95,6 +102,21 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'last_name',
             'is_active',
             'groups',
+            'reference_photo',
+            'punchin_selfie',
+            'punchout_selfie',
+        ]
+        
+        read_only_fields = [
+            'employee_id',
+            'email',
+            'first_name',
+            'last_name',
+            'is_active',
+            'groups',
+            'reference_photo',
+            'punchin_selfie',
+            'punchout_selfie',
         ]
 
     def get_groups(self, obj):

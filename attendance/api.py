@@ -1,17 +1,17 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday, EmployeeTrainingImage
+from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday
 from django.utils import timezone
 from main.serializers import EmpLeaveSerializer, HolidaySerializer, AttendanceSerializer
 from django.db.models import Q
 from datetime import datetime, timedelta, date
 from rest_framework import status
 from main.utils import verify_location
-from face_recognition.views import verify_selfie
 import logging
 from rest_framework.views import APIView
-from attendance.utils import simple_detect_and_crop_face
+from .face_recognition import compare_faces
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,76 +24,65 @@ def punch_in(request):
         employee = request.user.employee
         data = request.data
 
-        required_fields = ['check_in_lat', 'check_in_long']
-        if not all(field in data or field in request.FILES for field in required_fields):
-            return Response(
-                {"error": "Missing required fields: check_in_lat, check_in_long, photo_check_in, authorized"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if not all(field in data for field in ['check_in_lat', 'check_in_long']):
+            return Response({"error": "Missing required location fields"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if 'photo_check_in' not in request.FILES:
+            return Response({"error": "Photo is required for punch-in"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if Attendance.objects.filter(employee=employee, date=timezone.now().date()).exists():
+            return Response({"error": "You have already punched in today"}, status=status.HTTP_400_BAD_REQUEST)
 
         check_in_lat = float(data.get('check_in_lat'))
         check_in_long = float(data.get('check_in_long'))
-        authorized = data.get('authorized') in ['true', 'True', True]
+        photo_file = request.FILES.get('photo_check_in')
 
-        if Attendance.objects.filter(employee=employee, date=timezone.now().date()).exists():
-            return Response(
-                {"error": "You have already punched in today"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not verify_location(employee, check_in_lat, check_in_long):
-            return Response(
-                {"error": "You're not at an allowed location for punch-in"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+        # if not verify_location(employee, check_in_lat, check_in_long):
+        #     return Response(
+        #         {"error": "You're not at an allowed location for punch-in"},
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
+        
         verified_status = 'Pending'
-        selfie_message = None
-        photo_path = None
+        response_message = "Punch-in recorded successfully!"
 
-        if authorized:
-            verified_status = 'Verified'
-        else:
-            photo_file = request.FILES.get('photo_check_in')
-            if not photo_file:
-                return Response(
-                    {"error": "Photo is required for punch-in"},
-                    status=status.HTTP_400_BAD_REQUEST
+        if not employee.reference_photo:
+            employee.reference_photo = photo_file
+            employee.punchin_selfie = photo_file
+            employee.save()
+            
+            verified_status = 'Pending'
+            response_message = "Punch-in recorded. Your photo has been submitted for verification."
+
+        elif employee.reference_photo:
+            # CORRECTED: Use the new field name
+            employee.punchin_selfie = photo_file
+            employee.save()
+            
+            try:
+                employee.reference_photo.open('rb')
+                employee.punchin_selfie.open('rb')
+                source_bytes = employee.reference_photo.read()
+                target_bytes = employee.punchin_selfie.read()
+                employee.reference_photo.close()
+                employee.punchin_selfie.close()
+                
+                result = compare_faces(
+                    source_bytes=source_bytes,
+                    target_bytes=target_bytes,
+                    aws_access_key=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_key=settings.AWS_SECRET_ACCESS_KEY,
+                    aws_region=settings.AWS_REKOGNITION_REGION
                 )
-            cropped_photo, error_msg = simple_detect_and_crop_face(photo_file)
-            # --- HANDLE THE ERROR ---
-            if error_msg:
-                return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Check if face recognition is enabled for this employee
-            if employee.face_recognition_enabled:
-                # Use existing face recognition verification
-                verification_result = verify_selfie(cropped_photo, employee)
-                if verification_result['success']:
+                if result.get('FaceMatches'):
                     verified_status = 'Verified'
                 else:
-                    selfie_message = f"Face recognition failed: {verification_result['message']}"
-            else:
-                # Check if we can still collect training images
-                if employee.can_collect_training_image():
-                    # Save image for training
-                    training_image_saved = save_training_image(cropped_photo, employee)
-                    if training_image_saved:
-                        selfie_message = f"Training image saved. {employee.training_images_count}/10 images collected."
-                    else:
-                        selfie_message = "Failed to save training image."
-                else:
-                    selfie_message = "Maximum training images reached."
-
-                # For now, use the old verification method or set as pending
-                verification_result = verify_selfie(cropped_photo, employee)
-                if verification_result['success']:
-                    verified_status = 'Verified'
-                else:
-                    if selfie_message:
-                        selfie_message += f" Fallback verification: {verification_result['message']}"
-                    else:
-                        selfie_message = f"Verification failed: {verification_result['message']}"
+                    return Response({"error": "Face recognition failed. Please try again."}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            except Exception as e:
+                logger.error(f"Face comparison error for employee {employee.employee_id}: {str(e)}")
+                return Response({"error": "Could not process image. Ensure your face is clearly visible."}, status=status.HTTP_400_BAD_REQUEST)
 
         attendance = Attendance.objects.create(
             employee=employee,
@@ -101,49 +90,17 @@ def punch_in(request):
             check_in_time=timezone.now(),
             check_in_lat=check_in_lat,
             check_in_long=check_in_long,
-            photo_check_in='sample',
-            verified=verified_status
+            punchin_verification=verified_status
         )
 
-        response_data = {
-            "message": "Punch-in recorded successfully!",
+        return Response({
+            "message": response_message,
             "data": AttendanceSerializer(attendance).data,
-            "face_recognition_status": {
-                "enabled": employee.face_recognition_enabled,
-                "training_images_count": employee.training_images_count,
-                "training_complete": employee.training_images_count >= 10
-            }
-        }
-
-        if selfie_message:
-            response_data["warning"] = selfie_message
-
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_201_CREATED)
 
     except Exception as e:
         logger.error(f"Punch-in error: {str(e)}", exc_info=True)
-        return Response(
-            {"error": "An error occurred during punch-in"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-def save_training_image(photo_file, employee):
-    """Save training image for face recognition model"""
-    try:
-        # Create training image record
-        training_image = EmployeeTrainingImage.objects.create(
-            employee=employee,
-            image=photo_file
-        )
-        
-        # Update training images count
-        employee.training_images_count = employee.training_images.count()
-        employee.save()
-        
-        return True
-    except Exception as e:
-        logger.error(f"Error saving training image: {str(e)}")
-        return False
+        return Response({"error": "An unexpected error occurred during punch-in"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -152,63 +109,71 @@ def punch_out(request):
         employee = request.user.employee
         data = request.data
 
-        # Validate required fields
-        required_fields = ['check_out_lat', 'check_out_long']
-        if not all(field in data for field in required_fields):
-            return Response(
-                {"error": "Missing required fields (check_out_lat, check_out_long)"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if not all(field in data for field in ['check_out_lat', 'check_out_long']):
+            return Response({"error": "Missing required location fields"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if 'photo_check_out' not in request.FILES:
+            return Response({"error": "Photo is required for punch-out"}, status=status.HTTP_400_BAD_REQUEST)
+
+        attendance = Attendance.objects.filter(employee=employee, date=timezone.now().date()).first()
+
+        if not attendance:
+            return Response({"error": "No punch-in record found for today"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if attendance.check_out_time:
+            return Response({"error": "You have already punched out today"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # CORRECTED: More robust check. Do not create a reference photo on punch-out.
+        if not employee.reference_photo:
+            employee.reference_photo = photo_file
+            employee.save()
+            # return Response({"error": "Cannot punch out because your face is not enrolled."}, status=status.HTTP_400_BAD_REQUEST)
 
         check_out_lat = float(data.get('check_out_lat'))
         check_out_long = float(data.get('check_out_long'))
+        photo_file = request.FILES.get('photo_check_out')
 
-        # Get today's attendance record
-        attendance = Attendance.objects.filter(
-            employee=employee,
-            date=timezone.now().date()
-        ).first()
-
-        if not attendance:
-            return Response(
-                {"error": "No punch-in record found for today"},
-                status=status.HTTP_400_BAD_REQUEST
+        # CORRECTED: Use the new field name
+        employee.punchout_selfie = photo_file
+        employee.save()
+        
+        try:
+            employee.reference_photo.open('rb')
+            employee.punchout_selfie.open('rb')
+            source_bytes = employee.reference_photo.read()
+            target_bytes = employee.punchout_selfie.read()
+            employee.reference_photo.close()
+            employee.punchout_selfie.close()
+            
+            result = compare_faces(
+                source_bytes=source_bytes,
+                target_bytes=target_bytes,
+                aws_access_key=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_key=settings.AWS_SECRET_ACCESS_KEY,
+                aws_region=settings.AWS_REKOGNITION_REGION
             )
 
-        if attendance.check_out_time:
-            return Response(
-                {"error": "You have already punched out today"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if not result.get('FaceMatches'):
+                return Response({"error": "Face recognition failed. Please try again."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        except Exception as e:
+            logger.error(f"Face comparison error during punch-out for employee {employee.employee_id}: {str(e)}")
+            return Response({"error": "Could not process image. Ensure your face is clearly visible."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Verify location
-        if not verify_location(employee, check_out_lat, check_out_long):
-            return Response(
-                {"error": "You're not at an allowed location for punch-out"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Update attendance (without verifying or changing 'verified' field)
         attendance.check_out_time = timezone.now()
         attendance.check_out_lat = check_out_lat
         attendance.check_out_long = check_out_long
-        attendance.photo_check_out = 'sample2'  # Replace with actual file handling
+        attendance.punchout_verification = "Verified" 
         attendance.save()
 
-        return Response(
-            {
-                "message": "Punch-out recorded successfully!",
-                "data": AttendanceSerializer(attendance).data
-            },
-            status=status.HTTP_200_OK
-        )
+        return Response({
+            "message": "Punch-out recorded successfully!",
+            "data": AttendanceSerializer(attendance).data
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
         logger.error(f"Punch-out error: {str(e)}", exc_info=True)
-        return Response(
-            {"error": "An error occurred during punch-out"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({"error": "An error occurred during punch-out"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -582,4 +547,67 @@ def generate_report(request):
         current_date += timedelta(days=1)
 
     return Response(report)
+
+
+class VerifyAttendanceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        
+        # --- Permission Check: Ensure user is a Manager or Admin ---
+        if not (user.is_staff or user.groups.filter(name="Manager").exists()):
+            return Response(
+                {"error": "You do not have permission to perform this action."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # --- Input Validation ---
+        attendance_id = request.data.get('attendance_id')
+        verification_type = request.data.get('verification_type') # Expected: 'punchin' or 'punchout'
+        new_status = request.data.get('status') # Expected: 'Verified' or 'Rejected'
+        notes = request.data.get('notes', '') # Optional notes
+
+        if not all([attendance_id, verification_type, new_status]):
+            return Response(
+                {"error": "attendance_id, verification_type, and status are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if verification_type not in ['punchin', 'punchout']:
+            return Response({"error": "verification_type must be 'punchin' or 'punchout'."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if new_status not in ['Verified', 'Rejected']:
+            return Response({"error": "status must be 'Verified' or 'Rejected'."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # --- Database Update ---
+        try:
+            attendance = Attendance.objects.select_related('employee').get(attendance_id=attendance_id)
+            
+            # Security Check: Can this manager see this employee?
+            if user.groups.filter(name="Manager").exists():
+                manager_outlets = user.employee.outlets.all()
+                if not attendance.employee.outlets.filter(id__in=manager_outlets.values_list('id', flat=True)).exists():
+                    return Response({"error": "You are not authorized to verify this employee's attendance."}, status=status.HTTP_403_FORBIDDEN)
+
+            # Update the correct field
+            if verification_type == 'punchin':
+                attendance.punchin_verification = new_status
+            else: # 'punchout'
+                attendance.punchout_verification = new_status
+            
+            if notes:
+                attendance.verification_notes = notes
+                
+            attendance.save()
+            
+            # Return the updated record
+            serializer = AttendanceSerializer(attendance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Attendance.DoesNotExist:
+            return Response({"error": "Attendance record not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 

@@ -5,6 +5,8 @@ Django settings for aas project.
 from pathlib import Path
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = '/media/'
@@ -66,27 +68,27 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'aas.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DATABASE_NAME', 'AASDB'),
-        'USER': os.environ.get('DATABASE_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'postgres'),
-        'HOST': os.environ.get('DATABASE_HOST', 'db'),
-        'PORT': os.environ.get('DATABASE_PORT', '5432'),
-    }
-}
-
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'AASDB',
-#         'USER': 'postgres',
-#         'PASSWORD': 'postgres',
-#         'HOST': 'localhost',  
-#         'PORT': '5432',
+#         'NAME': os.environ.get('DATABASE_NAME', 'AASDB'),
+#         'USER': os.environ.get('DATABASE_USER', 'postgres'),
+#         'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'postgres'),
+#         'HOST': os.environ.get('DATABASE_HOST', 'db'),
+#         'PORT': os.environ.get('DATABASE_PORT', '5432'),
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'aas_db',
+        'USER': 'postgres',
+        'PASSWORD': 'postgres',
+        'HOST': 'localhost',  
+        'PORT': '5432',
+    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -130,3 +132,7 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = True  # ❗ Enable only in development. Restrict for production.
 
 HAARCASCADE_FILE_PATH = BASE_DIR / 'models' / 'haarcascade_frontalface_default.xml'
+
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REKOGNITION_REGION = os.getenv('AWS_REKOGNITION_REGION')

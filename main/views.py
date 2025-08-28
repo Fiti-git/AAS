@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from datetime import datetime
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from django.db.models import Q
+from rest_framework.permissions import IsAuthenticated
 
 
 def home(request):
@@ -659,34 +660,27 @@ class AllAttendanceRecordsView(generics.ListAPIView):
         else:
             raise PermissionDenied({"detail": "You do not have permission to access this data."})
 
-        # --- Optional Filters ---
+        # --- Updated Optional Filters ---
         start_date_str = self.request.query_params.get('start_date')
         end_date_str = self.request.query_params.get('end_date')
-        status_filter = self.request.query_params.get('status')
-        verified_filter = self.request.query_params.get('verified')
         employee_id = self.request.query_params.get('employee_id')
         search_query = self.request.query_params.get('search')
+        punchin_status = self.request.query_params.get('punchin_verification')
+        punchout_status = self.request.query_params.get('punchout_verification')
 
-        # Validate dates
-        try:
-            if start_date_str:
-                datetime.strptime(start_date_str, '%Y-%m-%d')
-                queryset = queryset.filter(date__gte=start_date_str)
-            if end_date_str:
-                datetime.strptime(end_date_str, '%Y-%m-%d')
-                queryset = queryset.filter(date__lte=end_date_str)
-        except ValueError:
-            raise ValidationError(
-                {"detail": "Invalid date format. Use YYYY-MM-DD."},
-                code=status.HTTP_400_BAD_REQUEST
-            )
-
-        if status_filter:
-            queryset = queryset.filter(status=status_filter)
-        if verified_filter:
-            queryset = queryset.filter(verified=verified_filter)
+        if start_date_str:
+            queryset = queryset.filter(date__gte=start_date_str)
+        if end_date_str:
+            queryset = queryset.filter(date__lte=end_date_str)
         if employee_id:
             queryset = queryset.filter(employee_id=employee_id)
+            
+        # --- ADDED FILTERS ---
+        if punchin_status:
+            queryset = queryset.filter(punchin_verification=punchin_status)
+        if punchout_status:
+            queryset = queryset.filter(punchout_verification=punchout_status)
+            
         if search_query:
             queryset = queryset.filter(
                 Q(employee__fullname__icontains=search_query) |
@@ -694,3 +688,33 @@ class AllAttendanceRecordsView(generics.ListAPIView):
             )
 
         return queryset.distinct() if queryset is not None else Attendance.objects.none()
+
+class ChangepswrdView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, employee_id, format=None):
+        requesting_user = request.user
+        if not requesting_user.groups.filter(name__in=['Manager', 'Admin']).exists():
+            return Response(
+                {"error": "You do not have permission to perform this action."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        employee = get_object_or_404(Employee, pk=employee_id)
+        target_user = employee.user
+
+        password = request.data.get('password')
+        
+        if password and len(request.data) == 1:
+            target_user.set_password(password)
+            target_user.save()
+            
+            return Response(
+                {"message": f"Password for {target_user.username} updated successfully."},
+                status=status.HTTP_200_OK
+            )
+        
+        return Response(
+            {"error": "Invalid update request. Provide a password to update or other valid fields."},
+            status=status.HTTP_400_BAD_REQUEST
+        )

@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
 from main import views
@@ -26,6 +28,7 @@ urlpatterns = [
     path('api/leavetypes/', views.LeaveTypeListCreateAPIView.as_view(), name='leave-type-list-create'),
     path('api/leavetypes/<int:pk>/', views.LeaveTypeDetailUpdateAPIView.as_view(), name='leave-type-detail-update'),
     path('login/', views.loginform_form, name='login'),
+    path('api/changepassword/<int:employee_id>/', views.ChangepswrdView.as_view(), name='edit-password'),
     # path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('api/user/', views.current_user, name='current-user'),
     path('api/agencies/', views.create_agency, name='create-agency'),
@@ -51,3 +54,6 @@ urlpatterns = [
     path('api/users/', include('users.apiurls')),
     path('admintool/', include('face_recognition.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
