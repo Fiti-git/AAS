@@ -15,4 +15,4 @@ tf-keras
 protobuf<=3.20.3
 mtcnn
 python-dotenv==1.0.1
-
+boto3
