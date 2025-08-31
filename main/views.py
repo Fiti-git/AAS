@@ -79,7 +79,7 @@ def create_employee(request):
     phone_number = data.get('phone_number', '')
     outlet_ids = data.getlist('outlets') if hasattr(data, 'getlist') else data.get('outlets', [])
     date_of_birth = data.get('date_of_birth')
-    profile_photo = data.get('profile_photo', '')
+    #profile_photo = data.get('profile_photo', '')
     password = data.get('password')
     username = data.get('fullname')  # Or some unique username logic
     first_name = data.get('first_name', '')
@@ -136,7 +136,7 @@ def create_employee(request):
             empcode=empcode,
             fullname=fullname,
             phone_number=phone_number,
-            profile_photo=profile_photo,
+            #profile_photo=profile_photo,
             date_of_birth=date_of_birth,
             cal_epf=cal_epf,
             epf_cal_date=epf_cal_date,
@@ -215,7 +215,7 @@ def edit_employee(request, employee_id):
         employee.fullname = data.get('fullname', employee.fullname)
         employee.empcode = data.get('empcode', employee.empcode)
         employee.phone_number = data.get('phone_number', employee.phone_number)
-        employee.profile_photo = data.get('profile_photo', employee.profile_photo)
+        #employee.profile_photo = data.get('profile_photo', employee.profile_photo)
         employee.date_of_birth = data.get('date_of_birth', employee.date_of_birth)
         cal_raw_value = data.get('cal_epf')
         if cal_raw_value is not None:
