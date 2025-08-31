@@ -237,12 +237,11 @@ def edit_employee(request, employee_id):
             except (ValueError, TypeError):
                 return Response({'error': 'Invalid employ_number.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        
         idnumber = data.get('idnumber', None)
         if idnumber is not None:
-            try:
-                employee.idnumber = int(idnumber)
-            except (ValueError, TypeError):
-                return Response({'error': 'Invalid idnumber.'}, status=status.HTTP_400_BAD_REQUEST)
+            employee.idnumber = str(idnumber)
+        
         
         basic_salary = data.get('basic_salary', None)
         if basic_salary in [None, '', 'null']:
