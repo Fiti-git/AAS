@@ -107,7 +107,7 @@ class Attendance(models.Model):
     )
     
     class Meta:
-        unique_together = ('employee', 'date')
+        #unique_together = ('employee', 'date')
         ordering = ['-date', 'employee']
     
     def __str__(self):
