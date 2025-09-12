@@ -37,6 +37,8 @@ class Employee(models.Model):
     etf_com_per = models.FloatField(default=3.0, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+    inactive_date = models.DateField(null=True, blank=True)
     
     reference_photo = models.ImageField(
         upload_to=reference_photo_upload_path, 
@@ -99,7 +101,10 @@ class Attendance(models.Model):
     punchout_verification = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    verification_notes = models.TextField(null=True, blank=True)
+    verification_notes = models.JSONField(
+        default=dict,  # ensures it’s always a dict by default
+        blank=True,
+    )
     
     class Meta:
         unique_together = ('employee', 'date')

@@ -15,6 +15,8 @@ from datetime import datetime
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+
 
 
 def home(request):
@@ -35,6 +37,30 @@ def get_all_employees(request):
     employees = Employee.objects.all()
     serializer = EmployeeSerializer(employees, many=True)
     return Response(serializer.data)
+
+@api_view(['GET'])
+def get_active_employees(request):
+    employees = Employee.objects.filter(is_active=True)  # only active
+    serializer = EmployeeSerializer(employees, many=True)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+def deactivate_employee(request, employee_id):
+    try:
+        employee = Employee.objects.get(employee_id=employee_id)
+    except Employee.DoesNotExist:
+        return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    employee.is_active = False
+    employee.inactive_date = timezone.now().date()
+    employee.save()
+    
+    return Response({
+        "message": f"Employee {employee.fullname} has been deactivated.",
+        "employee_id": employee.employee_id,
+        "inactive_date": employee.inactive_date
+    })
+
 
 @api_view(['GET'])
 def get_outlet_employees(request):

@@ -12,6 +12,8 @@ import logging
 from rest_framework.views import APIView
 from .face_recognition import compare_faces
 from django.conf import settings
+from dateutil import parser
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +32,14 @@ def punch_in(request):
         if 'photo_check_in' not in request.FILES:
             return Response({"error": "Photo is required for punch-in"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if Attendance.objects.filter(employee=employee, date=timezone.now().date()).exists():
-            return Response({"error": "You have already punched in today"}, status=status.HTTP_400_BAD_REQUEST)
+        open_attendance = Attendance.objects.filter(
+            employee=employee,
+            check_out_time__isnull=True
+        ).last()
+
+        if open_attendance:
+            return Response({"error": "You must punch out from your previous session before punching in again"}, status=400)
+            
 
         check_in_lat = float(data.get('check_in_lat'))
         check_in_long = float(data.get('check_in_long'))
@@ -93,6 +101,7 @@ def punch_in(request):
             punchin_verification=verified_status
         )
 
+
         return Response({
             "message": response_message,
             "data": AttendanceSerializer(attendance).data,
@@ -115,13 +124,13 @@ def punch_out(request):
         if 'photo_check_out' not in request.FILES:
             return Response({"error": "Photo is required for punch-out"}, status=status.HTTP_400_BAD_REQUEST)
 
-        attendance = Attendance.objects.filter(employee=employee, date=timezone.now().date()).first()
+        attendance = Attendance.objects.filter(
+            employee=employee,
+            check_out_time__isnull=True
+        ).last()
 
         if not attendance:
-            return Response({"error": "No punch-in record found for today"}, status=status.HTTP_400_BAD_REQUEST)
-
-        if attendance.check_out_time:
-            return Response({"error": "You have already punched out today"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "No active punch-in session found"}, status=400)
             
         # CORRECTED: More robust check. Do not create a reference photo on punch-out.
         if not employee.reference_photo:
@@ -244,6 +253,87 @@ def get_all_attendance(request):
     } for att in attendance]
 
     return Response(data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def update_attendance(request):
+    """
+    Update check-in and/or check-out times of an attendance record.
+    Recalculate worked hours, status, OT hours, and add verification notes.
+    """
+    data = request.data
+    attendance_id = data.get('attendance_id')
+    new_check_in = data.get('check_in_time')
+    new_check_out = data.get('check_out_time')
+
+    if not attendance_id:
+        return Response({"error": "attendance_id is required."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        attendance = Attendance.objects.get(attendance_id=attendance_id)
+    except Attendance.DoesNotExist:
+        return Response({"error": "Attendance record not found."},
+                        status=status.HTTP_404_NOT_FOUND)
+    
+    notes = attendance.verification_notes or {}
+
+    # Update check-in time if provided
+    if new_check_in:
+        try:
+            check_in_dt = parser.parse(new_check_in)
+            attendance.check_in_time = check_in_dt
+            # Update JSON note for check-in
+            notes['checkin_update'] = {
+                "updated_by": request.user.username,
+                "check_in_time": str(attendance.check_in_time),
+                "updated_at": timezone.now().isoformat()
+            }
+            attendance.punchin_verification = 'Verified'
+        except Exception as e:
+            return Response({"error": f"Invalid check_in_time format: {str(e)}"},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+    # Update check-out time if provided
+    if new_check_out:
+        try:
+            check_out_dt = parser.parse(new_check_out)
+            attendance.check_out_time = check_out_dt
+            # Update JSON note for check-out
+            notes['checkout_update'] = {
+                "updated_by": request.user.username,
+                "check_out_time": str(attendance.check_out_time),
+                "updated_at": timezone.now().isoformat()
+            }
+            attendance.punchout_verification = 'Verified'
+        except Exception as e:
+            return Response({"error": f"Invalid check_out_time format: {str(e)}"},
+                            status=status.HTTP_400_BAD_REQUEST)
+    
+    # Recalculate worked hours, OT hours, and status if both times exist
+    if attendance.check_in_time and attendance.check_out_time:
+        delta = attendance.check_out_time - attendance.check_in_time
+        attendance.worked_hours = round(delta.total_seconds() / 3600, 2)
+        if attendance.worked_hours < 4:
+            attendance.status = 'Half Day'
+        elif attendance.worked_hours > 8:
+            attendance.ot_hours = attendance.worked_hours - 8
+            attendance.status = 'Present'
+        else:
+            attendance.ot_hours = 0
+            attendance.status = 'Present'
+
+    attendance.verification_notes = notes
+    attendance.save()
+
+    return Response({
+        "message": "Attendance updated successfully",
+        "attendance_id": attendance.attendance_id,
+        "worked_hours": attendance.worked_hours,
+        "ot_hours": attendance.ot_hours,
+        "status": attendance.status,
+        "verification_notes": attendance.verification_notes
+    })
 
 
 # GET /attendance/{id} - View specific attendance record

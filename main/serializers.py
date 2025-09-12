@@ -78,6 +78,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     groups = serializers.SerializerMethodField()
     outlets = serializers.PrimaryKeyRelatedField(queryset=Outlet.objects.all(), many=True)
 
+
     class Meta:
         model = Employee
         fields = [
@@ -105,6 +106,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             'reference_photo',
             'punchin_selfie',
             'punchout_selfie',
+            'is_active',
+            'inactive_date',
         ]
         
         read_only_fields = [
