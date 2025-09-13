@@ -56,7 +56,7 @@ urlpatterns = [
     path('attendance/', include('attendance.urls')),
     path('api/users/', include('users.apiurls')),
     path('admintool/', include('face_recognition.urls')),
-    path('outlets/<int:pk>/', OutletDetailView.as_view(), name='outlet-detail'),
+    path('outletsalldata/<int:pk>/', OutletDetailView.as_view(), name='outlet-detail'),
 ]
 
 if settings.DEBUG:
