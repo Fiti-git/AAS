@@ -4,15 +4,10 @@ djangorestframework-simplejwt
 psycopg2-binary>=2.9
 django-cors-headers
 gunicorn>=21.2.0
-Flask
 numpy<2.0,>=1.24.0
-
 psutil
 Pillow
-deepface>=0.0.75
 opencv-python-headless>=4.5.5.62
-tf-keras
 protobuf<=3.20.3
-mtcnn
 python-dotenv==1.0.1
 boto3
