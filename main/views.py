@@ -759,11 +759,12 @@ class OutletDetailView(generics.RetrieveAPIView):
     """
     serializer_class = OutletDetailSerializer
     
-    # --- IMPORTANT PERFORMANCE OPTIMIZATION ---
-    # Use prefetch_related to efficiently fetch all related data in a few queries
-    # instead of hundreds or thousands (avoids the N+1 query problem).
+    # --- THIS IS THE CRITICAL FIX ---
+    # Use prefetch_related to efficiently fetch all related data in just a few queries.
     queryset = Outlet.objects.all().prefetch_related(
-        'employees',                  # Fetches all related employees
+        'employees',                  # Fetches all related employees for the outlet
+        'employees__user',            # For those employees, fetch their related user object
         'employees__attendances',     # For those employees, fetches all their attendance records
-        'employees__empleave_set'     # For those employees, fetches all their leave records
+        'employees__empleave_set',    # For those employees, fetches all their leave records
+        'employees__empleave_set__leave_type' # Also prefetch the leave type for each leave
     )
