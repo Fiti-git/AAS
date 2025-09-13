@@ -6,7 +6,7 @@ from django.contrib.auth.hashers import make_password
 from rest_framework.response import Response
 from rest_framework import status, generics
 from django.contrib.auth.models import User, Group
-from .serializers import OutletSerializer, EmployeeSerializer, AgencySerializer, HolidaySerializer, LeaveTypeSerializer, AttendanceSerializer
+from .serializers import OutletSerializer, EmployeeSerializer, AgencySerializer, HolidaySerializer, LeaveTypeSerializer, AttendanceSerializer,EmployeeDetailSerializer,OutletDetailSerializer
 from django.shortcuts import render
 from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
@@ -743,3 +743,27 @@ class ChangepswrdView(APIView):
             {"error": "Invalid update request. Provide a password to update or other valid fields."},
             status=status.HTTP_400_BAD_REQUEST
         )
+class EmployeeDetailView(generics.RetrieveAPIView):
+    """
+    API view to retrieve all details for a single employee,
+    including their attendance and leave records.
+    """
+    queryset = Employee.objects.all().prefetch_related('attendances', 'empleave_set')
+    serializer_class = EmployeeDetailSerializer
+    lookup_field = 'employee_id' # Or 'pk' if you prefer to use the primary key
+
+class OutletDetailView(generics.RetrieveAPIView):
+    """
+    API view to retrieve all details for a single Outlet, including a
+    full list of its employees and their attendance/leave records.
+    """
+    serializer_class = OutletDetailSerializer
+    
+    # --- IMPORTANT PERFORMANCE OPTIMIZATION ---
+    # Use prefetch_related to efficiently fetch all related data in a few queries
+    # instead of hundreds or thousands (avoids the N+1 query problem).
+    queryset = Outlet.objects.all().prefetch_related(
+        'employees',                  # Fetches all related employees
+        'employees__attendances',     # For those employees, fetches all their attendance records
+        'employees__empleave_set'     # For those employees, fetches all their leave records
+    )

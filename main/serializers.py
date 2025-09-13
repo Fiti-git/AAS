@@ -141,3 +141,39 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
         model = LeaveType
         fields = '__all__'
         read_only_fields = ('id',)
+
+class EmployeeDetailSerializer(EmployeeSerializer):
+    """
+    A detailed serializer for an employee that includes their related
+    attendance and leave records.
+    """
+    # The 'attendances' related_name comes from the ForeignKey in the Attendance model
+    attendances = AttendanceSerializer(many=True, read_only=True)
+    
+    # The 'empleave_set' is the default related_name for the ForeignKey in EmpLeave
+    leaves = EmpLeaveSerializer(many=True, read_only=True, source='empleave_set')
+
+    class Meta(EmployeeSerializer.Meta):
+        # Inherit the Meta class from the base EmployeeSerializer
+        # and add the new nested fields to the fields list.
+        fields = EmployeeSerializer.Meta.fields + ['attendances', 'leaves']
+
+class OutletDetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer for a single Outlet that includes a nested list of all
+    its employees with their full details.
+    """
+    # 'employees' is the related_name from the ManyToManyField in the Employee model.
+    # We use the EmployeeDetailSerializer to ensure all attendance and leave data is included.
+    employees = EmployeeDetailSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Outlet
+        # Include all fields from the Outlet model plus the nested 'employees' list.
+        fields = [
+            'id', 
+            'name', 
+            # Add any other fields from your Outlet model here
+            # e.g., 'address', 'phone_number', etc.
+            'employees'
+        ]
