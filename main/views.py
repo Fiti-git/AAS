@@ -16,6 +16,7 @@ from rest_framework.exceptions import ValidationError, PermissionDenied
 from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from django.db.models import Prefetch
 
 
 
@@ -759,19 +760,19 @@ class EmployeeDetailView(generics.RetrieveAPIView):
     serializer_class = EmployeeDetailSerializer
     lookup_field = 'employee_id' # Or 'pk' if you prefer to use the primary key
 
+from django.db.models import Prefetch
+
 class OutletDetailView(generics.RetrieveAPIView):
-    """
-    API view to retrieve all details for a single Outlet, including a
-    full list of its employees and their attendance/leave records.
-    """
     serializer_class = OutletDetailSerializer
-    
-    # --- THIS IS THE CRITICAL FIX ---
-    # Use prefetch_related to efficiently fetch all related data in just a few queries.
+
     queryset = Outlet.objects.all().prefetch_related(
-        'employees',                  # Fetches all related employees for the outlet
-        'employees__user',            # For those employees, fetch their related user object
-        'employees__attendances',     # For those employees, fetches all their attendance records
-        'employees__empleave_set',    # For those employees, fetches all their leave records
-        'employees__empleave_set__leave_type' # Also prefetch the leave type for each leave
+        Prefetch(
+            'employees',
+            queryset=Employee.objects.filter(is_active=True).select_related('user').prefetch_related(
+                'attendances',
+                'empleave_set',
+                'empleave_set__leave_type'
+            ),
+            to_attr='active_employees'  # save filtered employees in a custom attribute
+        )
     )
