@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday
 from django.utils import timezone
-from main.serializers import EmpLeaveSerializer, HolidaySerializer, AttendanceSerializer
+from main.serializers import EmpLeaveSerializer, HolidaySerializer, AttendanceSerializer,EmpLeaveCreateSerializer
 from django.db.models import Q
 from datetime import datetime, timedelta, date
 from rest_framework import status
@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 from .face_recognition import compare_faces
 from django.conf import settings
 from dateutil import parser
+
 
 
 logger = logging.getLogger(__name__)
@@ -707,3 +708,30 @@ class VerifyAttendanceView(APIView):
             return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_leave(request):
+    serializer = EmpLeaveCreateSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        # Check for duplicate leave for the same date and employee
+        existing = EmpLeave.objects.filter(
+            employee=serializer.validated_data['employee'],
+            leave_date=serializer.validated_data['leave_date']
+        ).exists()
+
+        if existing:
+            return Response({"success": False, "error": "Leave already exists for this employee on the selected date."}, status=400)
+
+        # Save leave
+        leave = serializer.save(
+            status='pending',
+            action_user=request.user,
+            action_date=None
+        )
+        return Response({
+            "success": True,
+            "leave_refno": leave.leave_refno
+        })
+    else:
+        return Response({"success": False, "errors": serializer.errors}, status=400)

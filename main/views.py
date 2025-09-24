@@ -1,12 +1,12 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view,permission_classes
 from .models import Agency, Employee, Outlet, Role, Holiday , LeaveType, Devices, Attendance
 from django.contrib.auth.hashers import make_password
 from rest_framework.response import Response
 from rest_framework import status, generics
 from django.contrib.auth.models import User, Group
-from .serializers import OutletSerializer, EmployeeSerializer, AgencySerializer, HolidaySerializer, LeaveTypeSerializer, AttendanceSerializer,EmployeeDetailSerializer,OutletDetailSerializer
+from .serializers import  OutletSerializer, EmployeeSerializer, AgencySerializer, HolidaySerializer, LeaveTypeSerializer, AttendanceSerializer,EmployeeDetailSerializer,OutletDetailSerializer
 from django.shortcuts import render
 from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
@@ -778,4 +778,4 @@ class OutletDetailView(generics.RetrieveAPIView):
         )
     )
 
-    
+

@@ -169,3 +169,8 @@ class OutletDetailSerializer(serializers.ModelSerializer):
         # Use the prefetch alias if it exists
         employees_qs = getattr(obj, "active_employees", obj.employees.all())
         return EmployeeDetailSerializer(employees_qs, many=True).data
+    
+class EmpLeaveCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmpLeave
+        fields = ['employee', 'leave_date', 'leave_type', 'remarks']

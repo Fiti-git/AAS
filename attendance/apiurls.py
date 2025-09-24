@@ -1,6 +1,7 @@
 from django.urls import path
 from . import api  # Import views from the current app
 
+
 urlpatterns = [
     path('punch-in/', api.punch_in, name='punch_in'),
     path('punch-out/', api.punch_out, name='punch_out'),
@@ -18,4 +19,5 @@ urlpatterns = [
     path('report/', api.generate_report, name='generate-report'),
     path('verify/', api.VerifyAttendanceView.as_view(), name='verify-attendance'),
     path('update/', api.update_attendance, name='update_attendance'),
+    path("addleave/", api.add_leave, name="add_leave_by_maanger"),
 ]

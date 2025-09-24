@@ -57,6 +57,7 @@ urlpatterns = [
     path('api/users/', include('users.apiurls')),
     path('admintool/', include('face_recognition.urls')),
     path('outletsalldata/<int:pk>/', OutletDetailView.as_view(), name='outlet-detail'),
+    
 ]
 
 if settings.DEBUG:
