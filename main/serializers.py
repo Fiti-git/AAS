@@ -160,20 +160,21 @@ class EmployeeDetailSerializer(EmployeeSerializer):
 
 class OutletDetailSerializer(serializers.ModelSerializer):
     """
-    Serializer for a single Outlet that includes a nested list of all
-    its employees with their full details.
+    Serializer for a single Outlet that includes only active employees
+    with their full details.
     """
-    # 'employees' is the related_name from the ManyToManyField in the Employee model.
-    # We use the EmployeeDetailSerializer to ensure all attendance and leave data is included.
-    employees = EmployeeDetailSerializer(many=True, read_only=True)
+    employees = serializers.SerializerMethodField()
 
     class Meta:
         model = Outlet
-        # Include all fields from the Outlet model plus the nested 'employees' list.
         fields = [
-            'id', 
-            'name', 
-            # Add any other fields from your Outlet model here
-            # e.g., 'address', 'phone_number', etc.
+            'id',
+            'name',
+            # add other outlet fields
             'employees'
         ]
+
+    def get_employees(self, obj):
+        # Use the Prefetch alias if present, otherwise fall back
+        employees_qs = getattr(obj, "active_employees", obj.employees.all())
+        return EmployeeDetailSerializer(employees_qs, many=True).data

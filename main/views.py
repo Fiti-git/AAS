@@ -764,15 +764,16 @@ from django.db.models import Prefetch
 
 class OutletDetailView(generics.RetrieveAPIView):
     serializer_class = OutletDetailSerializer
-
     queryset = Outlet.objects.all().prefetch_related(
         Prefetch(
             'employees',
-            queryset=Employee.objects.filter(is_active=True).select_related('user').prefetch_related(
-                'attendances',
-                'empleave_set',
-                'empleave_set__leave_type'
-            ),
-            to_attr='active_employees'  # save filtered employees in a custom attribute
+            queryset=Employee.objects.filter(user__is_active=True)
+                .select_related('user')
+                .prefetch_related(
+                    'attendances',
+                    'empleave_set',
+                    'empleave_set__leave_type'
+                ),
+            to_attr='active_employees'
         )
     )
