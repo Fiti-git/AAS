@@ -51,16 +51,22 @@ def deactivate_employee(request, employee_id):
     except Employee.DoesNotExist:
         return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
     
+    # Deactivate employee
     employee.is_active = False
     employee.inactive_date = timezone.now().date()
-    employee.save()
+    employee.save(update_fields=["is_active", "inactive_date"])
+
+    # Deactivate linked Django User
+    employee.user.is_active = False
+    employee.user.save(update_fields=["is_active"])
     
     return Response({
         "message": f"Employee {employee.fullname} has been deactivated.",
         "employee_id": employee.employee_id,
-         "is_active": employee.is_active, 
+        "is_active": employee.user.is_active,   # from auth_user
         "inactive_date": employee.inactive_date
     })
+
 
 
 @api_view(['GET'])
