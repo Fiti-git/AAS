@@ -159,22 +159,13 @@ class EmployeeDetailSerializer(EmployeeSerializer):
         fields = EmployeeSerializer.Meta.fields + ['attendances', 'leaves']
 
 class OutletDetailSerializer(serializers.ModelSerializer):
-    """
-    Serializer for a single Outlet that includes only active employees
-    with their full details.
-    """
     employees = serializers.SerializerMethodField()
 
     class Meta:
         model = Outlet
-        fields = [
-            'id',
-            'name',
-            # add other outlet fields
-            'employees'
-        ]
+        fields = ['id', 'name', 'employees']  # add other outlet fields if needed
 
     def get_employees(self, obj):
-        # Use the Prefetch alias if present, otherwise fall back
+        # Use the prefetch alias if it exists
         employees_qs = getattr(obj, "active_employees", obj.employees.all())
         return EmployeeDetailSerializer(employees_qs, many=True).data

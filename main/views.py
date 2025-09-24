@@ -760,7 +760,7 @@ class EmployeeDetailView(generics.RetrieveAPIView):
     serializer_class = EmployeeDetailSerializer
     lookup_field = 'employee_id' # Or 'pk' if you prefer to use the primary key
 
-from django.db.models import Prefetch
+
 
 class OutletDetailView(generics.RetrieveAPIView):
     serializer_class = OutletDetailSerializer
@@ -774,6 +774,8 @@ class OutletDetailView(generics.RetrieveAPIView):
                     'empleave_set',
                     'empleave_set__leave_type'
                 ),
-            to_attr='active_employees'
+            to_attr='active_employees'  # store filtered employees here
         )
     )
+
+    
