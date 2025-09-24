@@ -74,7 +74,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
     first_name = serializers.CharField(source='user.first_name', read_only=True)
     last_name = serializers.CharField(source='user.last_name', read_only=True)
-    is_active = serializers.BooleanField(source='user.is_active', read_only=True)
+    is_active = serializers.BooleanField(read_only=True)
     groups = serializers.SerializerMethodField()
     outlets = serializers.PrimaryKeyRelatedField(queryset=Outlet.objects.all(), many=True)
 
