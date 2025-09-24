@@ -58,6 +58,7 @@ def deactivate_employee(request, employee_id):
     return Response({
         "message": f"Employee {employee.fullname} has been deactivated.",
         "employee_id": employee.employee_id,
+         "is_active": employee.is_active, 
         "inactive_date": employee.inactive_date
     })
 

@@ -255,7 +255,7 @@ def get_all_attendance(request):
     return Response(data)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([IsAuthenticated])
 def update_attendance(request):
     """
     Update check-in and/or check-out times of an attendance record.
