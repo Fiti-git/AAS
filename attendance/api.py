@@ -255,6 +255,7 @@ def get_all_attendance(request):
 
     return Response(data)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_attendance(request):
@@ -282,11 +283,14 @@ def update_attendance(request):
     # Update check-in time if provided
     if new_check_in:
         try:
+            # Store the original check-in time
+            original_check_in_time = str(attendance.check_in_time) if attendance.check_in_time else None
             check_in_dt = parser.parse(new_check_in)
             attendance.check_in_time = check_in_dt
-            # Update JSON note for check-in
+            # Update the note to include both original and updated times
             notes['checkin_update'] = {
                 "updated_by": request.user.username,
+                "Original_check_in_time": original_check_in_time,
                 "check_in_time": str(attendance.check_in_time),
                 "updated_at": timezone.now().isoformat()
             }
@@ -298,11 +302,14 @@ def update_attendance(request):
     # Update check-out time if provided
     if new_check_out:
         try:
+            # Store the original check-out time
+            original_check_out_time = str(attendance.check_out_time) if attendance.check_out_time else None
             check_out_dt = parser.parse(new_check_out)
             attendance.check_out_time = check_out_dt
-            # Update JSON note for check-out
+            # Update the note to include both original and updated times
             notes['checkout_update'] = {
                 "updated_by": request.user.username,
+                "Original_check_out_time": original_check_out_time,
                 "check_out_time": str(attendance.check_out_time),
                 "updated_at": timezone.now().isoformat()
             }
@@ -310,7 +317,7 @@ def update_attendance(request):
         except Exception as e:
             return Response({"error": f"Invalid check_out_time format: {str(e)}"},
                             status=status.HTTP_400_BAD_REQUEST)
-    
+
     # Recalculate worked hours, OT hours, and status if both times exist
     if attendance.check_in_time and attendance.check_out_time:
         delta = attendance.check_out_time - attendance.check_in_time
@@ -335,7 +342,6 @@ def update_attendance(request):
         "status": attendance.status,
         "verification_notes": attendance.verification_notes
     })
-
 
 # GET /attendance/{id} - View specific attendance record
 @api_view(['GET'])
