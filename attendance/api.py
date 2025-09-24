@@ -714,14 +714,21 @@ def add_leave(request):
     serializer = EmpLeaveCreateSerializer(data=request.data)
     
     if serializer.is_valid():
-        # Check for duplicate leave for the same date and employee
+        employee = serializer.validated_data['employee']
+        leave_date = serializer.validated_data['leave_date']
+
+        # Check for existing leave with status 'pending' or 'approved' for the same employee on leave_date
         existing = EmpLeave.objects.filter(
-            employee=serializer.validated_data['employee'],
-            leave_date=serializer.validated_data['leave_date']
+            employee=employee,
+            leave_date=leave_date,
+            status__in=['pending', 'approved']
         ).exists()
 
         if existing:
-            return Response({"success": False, "error": "Leave already exists for this employee on the selected date."}, status=400)
+            return Response({
+                "success": False, 
+                "error": "A leave with status 'pending' or 'approved' already exists for this employee on the selected date."
+            }, status=400)
 
         # Save leave
         leave = serializer.save(
@@ -733,5 +740,6 @@ def add_leave(request):
             "success": True,
             "leave_refno": leave.leave_refno
         })
+
     else:
         return Response({"success": False, "errors": serializer.errors}, status=400)
