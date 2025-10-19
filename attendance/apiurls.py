@@ -20,4 +20,6 @@ urlpatterns = [
     path('verify/', api.VerifyAttendanceView.as_view(), name='verify-attendance'),
     path('update/', api.update_attendance, name='update_attendance'),
     path("addleave/", api.add_leave, name="add_leave_by_maanger"),
+    path('bulk-add/', api.bulk_add_attendance, name='bulk-add-attendance'),
+    path('bulk-addleave/', api.bulk_add_leave, name='bulk-add-leave'),
 ]

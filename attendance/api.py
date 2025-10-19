@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday
+from main.models import Attendance, Employee, LeaveType, EmpLeave, Holiday, Outlet
 from django.utils import timezone
 from main.serializers import EmpLeaveSerializer, HolidaySerializer, AttendanceSerializer,EmpLeaveCreateSerializer
 from django.db.models import Q
@@ -749,3 +749,174 @@ def add_leave(request):
 
     else:
         return Response({"success": False, "errors": serializer.errors}, status=400)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def bulk_add_attendance(request):
+    """
+    Adds or updates attendance for multiple employees using a single outlet's location.
+    """
+    data = request.data
+    employee_ids = data.get('employee_ids')
+    date_str = data.get('date')
+    check_in_str = data.get('check_in_time')
+    check_out_str = data.get('check_out_time')
+    outlet_id = data.get('outlet_id') # Expecting outlet_id from frontend
+
+    # --- Validation ---
+    if not all([employee_ids, date_str, check_in_str, check_out_str, outlet_id]):
+        return Response(
+            {"error": "employee_ids, outlet_id, date, check_in_time, and check_out_time are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # --- Get Outlet Location ---
+    try:
+        outlet = Outlet.objects.get(id=outlet_id)
+        if not outlet.latitude or not outlet.longitude:
+            return Response(
+                {"error": "The selected outlet does not have location data."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        outlet_lat = outlet.latitude
+        outlet_long = outlet.longitude
+    except Outlet.DoesNotExist:
+        return Response({"error": "Outlet not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        attendance_date = parser.parse(date_str).date()
+        check_in_dt = parser.parse(f"{date_str}T{check_in_str}")
+        check_out_dt = parser.parse(f"{date_str}T{check_out_str}")
+    except (ValueError, TypeError):
+        return Response(
+            {"error": "Invalid date or time format. Use YYYY-MM-DD for date and HH:MM for time."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # --- Processing ---
+    successful_updates = []
+    failed_updates = []
+
+    delta = check_out_dt - check_in_dt
+    worked_hours = round(delta.total_seconds() / 3600, 2)
+    ot_hours = max(0, worked_hours - 8)
+    status_val = 'Present' if worked_hours >= 4 else 'Half Day'
+    
+    notes = {
+        'manual_bulk_add': {
+            "updated_by": request.user.username,
+            "updated_at": timezone.now().isoformat()
+        }
+    }
+
+    # Find which employees exist from the provided list
+    existing_employees = Employee.objects.filter(employee_id__in=employee_ids)
+    existing_employee_ids = {emp.employee_id for emp in existing_employees}
+    
+    # Determine which IDs were not found
+    for emp_id in employee_ids:
+        if emp_id not in existing_employee_ids:
+            failed_updates.append({"employee_id": emp_id, "error": "Employee not found."})
+
+    # Process only the employees that were found
+    for employee in existing_employees:
+        try:
+            Attendance.objects.update_or_create(
+                employee=employee,
+                date=attendance_date,
+                defaults={
+                    'check_in_time': check_in_dt,
+                    'check_out_time': check_out_dt,
+                    'worked_hours': worked_hours,
+                    'ot_hours': ot_hours,
+                    'status': status_val,
+                    'check_in_lat': outlet_lat,
+                    'check_in_long': outlet_long,
+                    'check_out_lat': outlet_lat,
+                    'check_out_long': outlet_long,
+                    'punchin_verification': 'Verified',
+                    'punchout_verification': 'Verified',
+                    'verification_notes': notes
+                }
+            )
+            successful_updates.append(employee.employee_id)
+        except Exception as e:
+            failed_updates.append({"employee_id": employee.employee_id, "error": str(e)})
+
+    return Response({
+        "message": f"Bulk operation completed. {len(successful_updates)} records processed.",
+        "successful_updates": successful_updates,
+        "failed_updates": failed_updates
+    }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def bulk_add_leave(request):
+    """
+    Adds leave records for multiple employees for a single date.
+    Skips any employee who already has a pending or approved leave on that date.
+    Sets the status to 'approved' as this is a direct admin/manager action.
+    """
+    data = request.data
+    employee_ids = data.get('employee_ids')
+    leave_date_str = data.get('leave_date')
+    leave_type_id = data.get('leave_type')
+    remarks = data.get('remarks', '') # Remarks are optional
+
+    # --- Validation ---
+    if not all([employee_ids, leave_date_str, leave_type_id]):
+        return Response(
+            {"error": "employee_ids, leave_date, and leave_type are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        leave_date = parser.parse(leave_date_str).date()
+        leave_type = LeaveType.objects.get(id=leave_type_id)
+    except (ValueError, TypeError):
+        return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+    except LeaveType.DoesNotExist:
+        return Response({"error": "LeaveType not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # --- Processing ---
+    successful_adds = []
+    failed_adds = []
+    
+    # Fetch all employees to process
+    employees_to_process = Employee.objects.filter(employee_id__in=employee_ids)
+    
+    # Get a set of (employee_id, leave_date) for existing leaves to check for duplicates efficiently
+    existing_leaves = EmpLeave.objects.filter(
+        employee_id__in=employee_ids,
+        leave_date=leave_date,
+        status__in=['pending', 'approved']
+    ).values_list('employee_id', flat=True)
+    existing_leave_set = set(existing_leaves)
+
+    for employee in employees_to_process:
+        if employee.employee_id in existing_leave_set:
+            failed_adds.append({
+                "employee_id": employee.employee_id,
+                "error": "An active leave already exists for this date."
+            })
+            continue
+
+        try:
+            EmpLeave.objects.create(
+                employee=employee,
+                leave_date=leave_date,
+                leave_type=leave_type,
+                remarks=remarks,
+                status='approved',  # Approve directly since it's a manual add
+                action_user=request.user,
+                action_date=timezone.now()
+            )
+            successful_adds.append(employee.employee_id)
+        except Exception as e:
+            failed_adds.append({"employee_id": employee.employee_id, "error": str(e)})
+
+    return Response({
+        "message": f"Bulk leave operation completed. {len(successful_adds)} leaves added.",
+        "successful_adds": successful_adds,
+        "failed_adds": failed_adds
+    }, status=status.HTTP_200_OK)
