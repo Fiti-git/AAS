@@ -155,59 +155,163 @@ class EmployeeReportAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class EmployeesByOutletAPIView(APIView):
+class EmployeeDetailsByUserAPIView(APIView):
     """
-    Returns list of employees associated with one or more outlets (access IDs).
+    Returns employee details based on the provided user_id.
     """
 
-    def get(self, request, format=None):
-        access_ids = request.query_params.get("access_ids")
-        if not access_ids:
-            return Response({"detail": "access_ids parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # split and sanitize
-        try:
-            outlet_ids = [int(x) for x in access_ids.split(",") if x.strip()]
-        except ValueError:
-            return Response({"detail": "access_ids must be comma separated integers."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # build SQL
+    def get(self, request, user_id, format=None):
         query = """
         WITH emp_outlets AS (
             SELECT
                 e.employee_id,
-                STRING_AGG(o.name, ', ' ORDER BY o.name) AS outlet_names,
-                ARRAY_AGG(o.id ORDER BY o.id) AS outlet_ids
+                STRING_AGG(o.name, ', ') AS outlet_names,
+                ARRAY_AGG(o.id) AS outlet_ids
             FROM main_employee e
-            JOIN main_employee_outlets eo ON e.employee_id = eo.employee_id
-            JOIN main_outlet o ON eo.outlet_id = o.id
-            WHERE eo.outlet_id = ANY(%s)
+            LEFT JOIN main_employee_outlets eo ON e.employee_id = eo.employee_id
+            LEFT JOIN main_outlet o ON eo.outlet_id = o.id
             GROUP BY e.employee_id
         )
         SELECT
             e.employee_id,
             e.user_id,
-            u.first_name AS user_first_name,
             e.fullname,
+            u.first_name AS user_first_name,
             e.inactive_date,
             eo.outlet_names,
             eo.outlet_ids
         FROM main_employee e
         LEFT JOIN auth_user u ON e.user_id = u.id
-        JOIN emp_outlets eo ON e.employee_id = eo.employee_id
-        WHERE eo.employee_id IS NOT NULL
-        ORDER BY e.employee_id;
+        LEFT JOIN emp_outlets eo ON e.employee_id = eo.employee_id
+        WHERE e.user_id = %s
         """
 
-        params = [outlet_ids]
+        params = [user_id]
 
         try:
             with connection.cursor() as cursor:
                 cursor.execute(query, params)
                 columns = [col[0] for col in cursor.description]
-                data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-            return Response(data, status=status.HTTP_200_OK)
+            if not rows:
+                return Response(
+                    {"detail": "No employee data found for the given user."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # ✅ Extract employee details (same for all rows)
+            first_row = rows[0]
+            employee_details = {
+                "employee_id": first_row["employee_id"],
+                "user_id": first_row["user_id"],
+                "user_first_name": first_row["user_first_name"],
+                "fullname": first_row["fullname"],
+                "inactive_date": first_row["inactive_date"],
+                "outlet_names": first_row["outlet_names"],
+                "outlet_ids": first_row["outlet_ids"],
+            }
+
+            return Response(employee_details, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class EmployeeDetailsByUserAPIView(APIView):
+    """
+    API endpoint to get:
+        - Manager info (employee_id, user_id)
+        - All employees grouped by outlet that belong to the same outlets
+    """
+
+    def get(self, request, user_id, format=None):
+        # Step 1: Get manager details + their outlet IDs
+        manager_query = """
+        WITH emp_outlets AS (
+            SELECT
+                e.employee_id,
+                ARRAY_AGG(o.id) AS outlet_ids
+            FROM main_employee e
+            LEFT JOIN main_employee_outlets eo ON e.employee_id = eo.employee_id
+            LEFT JOIN main_outlet o ON eo.outlet_id = o.id
+            GROUP BY e.employee_id
+        )
+        SELECT
+            e.employee_id,
+            e.user_id,
+            eo.outlet_ids
+        FROM main_employee e
+        LEFT JOIN emp_outlets eo ON e.employee_id = eo.employee_id
+        WHERE e.user_id = %s
+        """
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(manager_query, [user_id])
+                row = cursor.fetchone()
+
+            if not row:
+                return Response(
+                    {"detail": "No employee found for the given user ID."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            manager_employee_id, manager_user_id, outlet_ids = row
+
+            # Step 2: If manager has outlets, get all employees in those outlets
+            employees_by_outlet = {}
+            if outlet_ids:
+                employees_query = """
+                WITH outlet_ids AS (
+                    SELECT UNNEST(%s::int[]) AS outlet_id
+                )
+                SELECT
+                    e.employee_id,
+                    e.user_id,
+                    u.first_name AS user_first_name,
+                    e.fullname,
+                    o.id AS outlet_id,
+                    o.name AS outlet_name
+                FROM main_employee e
+                LEFT JOIN auth_user u ON e.user_id = u.id
+                LEFT JOIN main_employee_outlets eo ON e.employee_id = eo.employee_id
+                LEFT JOIN main_outlet o ON eo.outlet_id = o.id
+                WHERE o.id IN (SELECT outlet_id FROM outlet_ids)
+                ORDER BY o.id, e.fullname;
+                """
+
+                with connection.cursor() as cursor:
+                    cursor.execute(employees_query, [outlet_ids])
+                    cols = [col[0] for col in cursor.description]
+                    employees = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+                # Group employees by outlet
+                for emp in employees:
+                    outlet_id = emp["outlet_id"]
+                    outlet_name = emp["outlet_name"]
+                    if outlet_id not in employees_by_outlet:
+                        employees_by_outlet[outlet_id] = {
+                            "outlet_name": outlet_name,
+                            "employees": [],
+                        }
+                    employees_by_outlet[outlet_id]["employees"].append({
+                        "employee_id": emp["employee_id"],
+                        "fullname": emp["fullname"],
+                        "user_first_name": emp["user_first_name"],
+                        "user_id": emp["user_id"],
+                    })
+
+            # Step 3: Build the response
+            response_data = {
+                "manager": {
+                    "employee_id": manager_employee_id,
+                    "user_id": manager_user_id,
+                },
+                "employees_by_outlet": employees_by_outlet,
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
