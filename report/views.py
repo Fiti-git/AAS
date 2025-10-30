@@ -3,9 +3,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import connection
 
+
 class EmployeeReportAPIView(APIView):
     """
-    Returns a comprehensive report for a single employee, with optional date filters.
+    Returns a comprehensive employee report structured into:
+    1. Employee details
+    2. Attendance records
+    3. Approved leave records
     """
 
     def get(self, request, employee_id, format=None):
@@ -73,12 +77,11 @@ class EmployeeReportAPIView(APIView):
         LEFT JOIN emp_outlets eo ON e.employee_id = eo.employee_id
         LEFT JOIN daily_attendance da ON e.employee_id = da.employee_id
         LEFT JOIN approved_leaves al
-
             ON e.employee_id = al.employee_id
            AND da.work_date = al.leave_date
         WHERE e.employee_id = %s
         """
-        
+
         params = [employee_id]
 
         if start_date:
@@ -95,15 +98,58 @@ class EmployeeReportAPIView(APIView):
             with connection.cursor() as cursor:
                 cursor.execute(query, params)
                 columns = [col[0] for col in cursor.description]
-                data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-            if not data:
+            if not rows:
                 return Response(
                     {"detail": "No report data found for this employee."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            return Response(data, status=status.HTTP_200_OK)
+            # ✅ Extract employee details (same for all rows)
+            first_row = rows[0]
+            employee_details = {
+                "employee_id": first_row["employee_id"],
+                "user_id": first_row["user_id"],
+                "user_first_name": first_row["user_first_name"],
+                "fullname": first_row["fullname"],
+                "inactive_date": first_row["inactive_date"],
+                "outlet_names": first_row["outlet_names"],
+                "outlet_ids": first_row["outlet_ids"],
+            }
+
+            # ✅ Extract attendance and leave data
+            attendance = []
+            leaves = []
+
+            for row in rows:
+                if row["work_date"]:  # Attendance record
+                    attendance.append({
+                        "work_date": row["work_date"],
+                        "check_in_time": row["check_in_time"],
+                        "check_out_time": row["check_out_time"],
+                        "worked_hours": row["worked_hours"],
+                        "attendance_status": row["attendance_status"],
+                        "verification_notes": row["verification_notes"] or []
+                    })
+
+                if row["leave_date"]:  # Leave record
+                    leaves.append({
+                        "leave_date": row["leave_date"],
+                        "leave_refno": row["leave_refno"],
+                        "leave_remarks": row["leave_remarks"],
+                        "leave_type_id": row["leave_type_id"],
+                        "att_type": row["att_type"],
+                        "att_type_name": row["att_type_name"]
+                    })
+
+            response_data = {
+                "employee_details": employee_details,
+                "attendance": attendance,
+                "leaves": leaves,
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
