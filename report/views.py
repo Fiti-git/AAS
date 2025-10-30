@@ -153,3 +153,61 @@ class EmployeeReportAPIView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class EmployeesByOutletAPIView(APIView):
+    """
+    Returns list of employees associated with one or more outlets (access IDs).
+    """
+
+    def get(self, request, format=None):
+        access_ids = request.query_params.get("access_ids")
+        if not access_ids:
+            return Response({"detail": "access_ids parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # split and sanitize
+        try:
+            outlet_ids = [int(x) for x in access_ids.split(",") if x.strip()]
+        except ValueError:
+            return Response({"detail": "access_ids must be comma separated integers."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # build SQL
+        query = """
+        WITH emp_outlets AS (
+            SELECT
+                e.employee_id,
+                STRING_AGG(o.name, ', ' ORDER BY o.name) AS outlet_names,
+                ARRAY_AGG(o.id ORDER BY o.id) AS outlet_ids
+            FROM main_employee e
+            JOIN main_employee_outlets eo ON e.employee_id = eo.employee_id
+            JOIN main_outlet o ON eo.outlet_id = o.id
+            WHERE eo.outlet_id = ANY(%s)
+            GROUP BY e.employee_id
+        )
+        SELECT
+            e.employee_id,
+            e.user_id,
+            u.first_name AS user_first_name,
+            e.fullname,
+            e.inactive_date,
+            eo.outlet_names,
+            eo.outlet_ids
+        FROM main_employee e
+        LEFT JOIN auth_user u ON e.user_id = u.id
+        JOIN emp_outlets eo ON e.employee_id = eo.employee_id
+        WHERE eo.employee_id IS NOT NULL
+        ORDER BY e.employee_id;
+        """
+
+        params = [outlet_ids]
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(query, params)
+                columns = [col[0] for col in cursor.description]
+                data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            return Response(data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
