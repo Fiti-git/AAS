@@ -5,15 +5,14 @@ from django.db import connection
 
 class EmployeeReportAPIView(APIView):
     """
-    Returns a comprehensive report for a single employee.
+    Returns a comprehensive report for a single employee, with optional date filters.
     """
 
     def get(self, request, employee_id, format=None):
-        """
-        Execute the raw SQL report query for the given employee_id.
-        """
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
         query = """
-        -- Aggregate outlets for all employees
         WITH emp_outlets AS (
             SELECT
                 e.employee_id,
@@ -24,8 +23,6 @@ class EmployeeReportAPIView(APIView):
             LEFT JOIN main_outlet o ON eo.outlet_id = o.id
             GROUP BY e.employee_id
         ),
-
-        -- Aggregate daily attendance for all employees
         daily_attendance AS (
             SELECT
                 employee_id,
@@ -38,8 +35,6 @@ class EmployeeReportAPIView(APIView):
             FROM main_attendance
             GROUP BY employee_id, DATE(check_in_time)
         ),
-
-        -- Only approved leaves for all employees
         approved_leaves AS (
             SELECT
                 l.employee_id,
@@ -53,12 +48,11 @@ class EmployeeReportAPIView(APIView):
             LEFT JOIN leave_type lt ON l.leave_type_id = lt.id
             WHERE l.status = 'approved'
         )
-
-        -- Final select with filtering applied at the end
         SELECT
             e.employee_id,
             e.user_id,
             e.fullname,
+            u.first_name AS user_first_name,
             e.inactive_date,
             eo.outlet_names,
             eo.outlet_ids,
@@ -75,18 +69,31 @@ class EmployeeReportAPIView(APIView):
             al.att_type,
             al.att_type_name
         FROM main_employee e
+        LEFT JOIN auth_user u ON e.user_id = u.id
         LEFT JOIN emp_outlets eo ON e.employee_id = eo.employee_id
         LEFT JOIN daily_attendance da ON e.employee_id = da.employee_id
         LEFT JOIN approved_leaves al
+
             ON e.employee_id = al.employee_id
            AND da.work_date = al.leave_date
         WHERE e.employee_id = %s
-        ORDER BY da.work_date DESC NULLS LAST;
         """
+        
+        params = [employee_id]
+
+        if start_date:
+            query += " AND COALESCE(da.work_date, al.leave_date) >= %s"
+            params.append(start_date)
+
+        if end_date:
+            query += " AND COALESCE(da.work_date, al.leave_date) <= %s"
+            params.append(end_date)
+
+        query += " ORDER BY da.work_date DESC NULLS LAST;"
 
         try:
             with connection.cursor() as cursor:
-                cursor.execute(query, [employee_id])  # safely parameterized
+                cursor.execute(query, params)
                 columns = [col[0] for col in cursor.description]
                 data = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -99,6 +106,4 @@ class EmployeeReportAPIView(APIView):
             return Response(data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
