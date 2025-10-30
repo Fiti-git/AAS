@@ -62,6 +62,7 @@ class EmpLeaveSerializer(serializers.ModelSerializer):
             'leave_type_id',
             'leave_type_name',
             'action_user'
+            'att_type'
         ]
 
 

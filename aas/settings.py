@@ -34,7 +34,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'main',
     'attendance',
-    'face_recognition'
+    'face_recognition',
+    'report'
 ]
 
 MIDDLEWARE = [
