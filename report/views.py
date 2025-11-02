@@ -2,19 +2,31 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import connection
+from datetime import datetime, date, timedelta
 
 
 class EmployeeReportAPIView(APIView):
     """
     Returns a comprehensive employee report structured into:
     1. Employee details
-    2. Attendance records
-    3. Approved leave records
+    2. Daily report covering attendance, leave, and blank days
     """
 
     def get(self, request, employee_id, format=None):
-        start_date = request.query_params.get("start_date")
-        end_date = request.query_params.get("end_date")
+        start_date_str = request.query_params.get("start_date")
+        end_date_str = request.query_params.get("end_date")
+
+        # 🗓️ Parse or default to current month
+        today = date.today()
+        if start_date_str and end_date_str:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        else:
+            start_date = date(today.year, today.month, 1)
+            if today.month == 12:
+                end_date = date(today.year, 12, 31)
+            else:
+                end_date = date(today.year, today.month + 1, 1) - timedelta(days=1)
 
         query = """
         WITH emp_outlets AS (
@@ -80,19 +92,12 @@ class EmployeeReportAPIView(APIView):
             ON e.employee_id = al.employee_id
            AND da.work_date = al.leave_date
         WHERE e.employee_id = %s
+          AND COALESCE(da.work_date, al.leave_date) >= %s
+          AND COALESCE(da.work_date, al.leave_date) <= %s
+        ORDER BY da.work_date DESC NULLS LAST;
         """
 
-        params = [employee_id]
-
-        if start_date:
-            query += " AND COALESCE(da.work_date, al.leave_date) >= %s"
-            params.append(start_date)
-
-        if end_date:
-            query += " AND COALESCE(da.work_date, al.leave_date) <= %s"
-            params.append(end_date)
-
-        query += " ORDER BY da.work_date DESC NULLS LAST;"
+        params = [employee_id, start_date, end_date]
 
         try:
             with connection.cursor() as cursor:
@@ -118,12 +123,11 @@ class EmployeeReportAPIView(APIView):
                 "outlet_ids": first_row["outlet_ids"],
             }
 
-            # ✅ Extract attendance and leave data
+            # ✅ Prepare attendance and leave data
             attendance = []
             leaves = []
-
             for row in rows:
-                if row["work_date"]:  # Attendance record
+                if row["work_date"]:
                     attendance.append({
                         "work_date": row["work_date"],
                         "check_in_time": row["check_in_time"],
@@ -133,7 +137,7 @@ class EmployeeReportAPIView(APIView):
                         "verification_notes": row["verification_notes"] or []
                     })
 
-                if row["leave_date"]:  # Leave record
+                if row["leave_date"]:
                     leaves.append({
                         "leave_date": row["leave_date"],
                         "leave_refno": row["leave_refno"],
@@ -143,17 +147,50 @@ class EmployeeReportAPIView(APIView):
                         "att_type_name": row["att_type_name"]
                     })
 
+            # ✅ Convert to lookup dicts for faster merge
+            attendance_dict = {a["work_date"]: a for a in attendance}
+            leave_dict = {l["leave_date"]: l for l in leaves}
+
+            # ✅ Generate all dates in the range
+            all_dates = []
+            current = start_date
+            while current <= end_date:
+                all_dates.append(current)
+                current += timedelta(days=1)
+
+            # ✅ Combine into full daily report
+            daily_report = []
+            for d in all_dates:
+                record = {
+                    "work_date": d,
+                    "check_in_time": None,
+                    "check_out_time": None,
+                    "worked_hours": None,
+                    "attendance_status": None,
+                    "verification_notes": [],
+                    "leave_refno": None,
+                    "leave_remarks": None,
+                    "leave_type_id": None,
+                    "att_type": None,
+                    "att_type_name": None,
+                }
+
+                if d in attendance_dict:
+                    record.update(attendance_dict[d])
+                if d in leave_dict:
+                    record.update(leave_dict[d])
+
+                daily_report.append(record)
+
             response_data = {
                 "employee_details": employee_details,
-                "attendance": attendance,
-                "leaves": leaves,
+                "daily_report": daily_report,
             }
 
             return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class EmployeeDetailsByUserAPIView(APIView):
     """
