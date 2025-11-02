@@ -4,7 +4,6 @@ from rest_framework import status
 from django.db import connection
 from datetime import datetime, date, timedelta
 
-
 class EmployeeReportAPIView(APIView):
     """
     Returns a comprehensive employee report structured into:
@@ -19,14 +18,27 @@ class EmployeeReportAPIView(APIView):
         # 🗓️ Parse or default to current month
         today = date.today()
         if start_date_str and end_date_str:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return Response(
+                    {"detail": "Invalid date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         else:
+            # Default to the first day of the current month
             start_date = date(today.year, today.month, 1)
+            # Default to the last day of the current month
             if today.month == 12:
                 end_date = date(today.year, 12, 31)
             else:
                 end_date = date(today.year, today.month + 1, 1) - timedelta(days=1)
+
+        # The key change is here: the LEFT JOIN with approved_leaves should not be constrained
+        # by da.work_date, as we want leave records even if there is no attendance record for that day.
+        # The main JOIN is between the employee, daily_attendance, and approved_leaves.
+        # We want records where EITHER attendance OR leave exists, constrained by the date range.
 
         query = """
         WITH emp_outlets AS (
@@ -49,6 +61,7 @@ class EmployeeReportAPIView(APIView):
                 MAX(status) AS attendance_status,
                 JSON_AGG(verification_notes) AS verification_notes
             FROM main_attendance
+            WHERE DATE(check_in_time) BETWEEN %s AND %s  -- Filter attendance by date range early
             GROUP BY employee_id, DATE(check_in_time)
         ),
         approved_leaves AS (
@@ -63,6 +76,7 @@ class EmployeeReportAPIView(APIView):
             FROM main_empleave l
             LEFT JOIN leave_type lt ON l.leave_type_id = lt.id
             WHERE l.status = 'approved'
+              AND l.leave_date BETWEEN %s AND %s -- Filter leaves by date range early
         )
         SELECT
             e.employee_id,
@@ -87,17 +101,17 @@ class EmployeeReportAPIView(APIView):
         FROM main_employee e
         LEFT JOIN auth_user u ON e.user_id = u.id
         LEFT JOIN emp_outlets eo ON e.employee_id = eo.employee_id
-        LEFT JOIN daily_attendance da ON e.employee_id = da.employee_id
-        LEFT JOIN approved_leaves al
+        -- Use FULL OUTER JOIN to get a union of attendance and leave days
+        FULL OUTER JOIN daily_attendance da ON e.employee_id = da.employee_id
+        FULL OUTER JOIN approved_leaves al
             ON e.employee_id = al.employee_id
-           AND da.work_date = al.leave_date
+           AND COALESCE(da.work_date, al.leave_date) = al.leave_date -- Join attendance and leave on the same date
         WHERE e.employee_id = %s
-          AND COALESCE(da.work_date, al.leave_date) >= %s
-          AND COALESCE(da.work_date, al.leave_date) <= %s
-        ORDER BY da.work_date DESC NULLS LAST;
+          AND COALESCE(da.work_date, al.leave_date) IS NOT NULL -- Ensure we only get dates with some activity (should be covered by the date filter in CTEs but good practice)
+        ORDER BY COALESCE(da.work_date, al.leave_date) DESC;
         """
 
-        params = [employee_id, start_date, end_date]
+        params = [start_date, end_date, start_date, end_date, employee_id]
 
         try:
             with connection.cursor() as cursor:
@@ -106,12 +120,15 @@ class EmployeeReportAPIView(APIView):
                 rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
             if not rows:
+                # Still check if employee details are available even if no daily data
+                # but for simplicity keep the 404 for now
                 return Response(
-                    {"detail": "No report data found for this employee."},
+                    {"detail": "No report data found for this employee in the specified period."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
             # ✅ Extract employee details (same for all rows)
+            # Use the first row where employee data is guaranteed from the main_employee table
             first_row = rows[0]
             employee_details = {
                 "employee_id": first_row["employee_id"],
@@ -123,10 +140,17 @@ class EmployeeReportAPIView(APIView):
                 "outlet_ids": first_row["outlet_ids"],
             }
 
-            # ✅ Prepare attendance and leave data
+            # ✅ Prepare attendance and leave data from all rows
             attendance = []
             leaves = []
+            
+            # Use the actual date from the row which could be da.work_date or al.leave_date
+            # The FULL OUTER JOIN ensures we get a row for every day with *either* attendance or leave
             for row in rows:
+                report_date = row.get("work_date") or row.get("leave_date")
+                if not report_date:
+                    continue # Skip if no date is found
+
                 if row["work_date"]:
                     attendance.append({
                         "work_date": row["work_date"],
@@ -134,14 +158,14 @@ class EmployeeReportAPIView(APIView):
                         "check_out_time": row["check_out_time"],
                         "worked_hours": row["worked_hours"],
                         "attendance_status": row["attendance_status"],
-                        "verification_notes": row["verification_notes"] or []
+                        "verification_notes": row["verification_notes"] or [] # Correctly included
                     })
 
                 if row["leave_date"]:
                     leaves.append({
                         "leave_date": row["leave_date"],
                         "leave_refno": row["leave_refno"],
-                        "leave_remarks": row["leave_remarks"],
+                        "leave_remarks": row["leave_remarks"], # Correctly included
                         "leave_type_id": row["leave_type_id"],
                         "att_type": row["att_type"],
                         "att_type_name": row["att_type_name"]
@@ -158,7 +182,7 @@ class EmployeeReportAPIView(APIView):
                 all_dates.append(current)
                 current += timedelta(days=1)
 
-            # ✅ Combine into full daily report
+            # ✅ Combine into full daily report for *all* days
             daily_report = []
             for d in all_dates:
                 record = {
@@ -169,7 +193,7 @@ class EmployeeReportAPIView(APIView):
                     "attendance_status": None,
                     "verification_notes": [],
                     "leave_refno": None,
-                    "leave_remarks": None,
+                    "leave_remarks": None, # Will be filled if leave_dict has data
                     "leave_type_id": None,
                     "att_type": None,
                     "att_type_name": None,
@@ -179,6 +203,10 @@ class EmployeeReportAPIView(APIView):
                     record.update(attendance_dict[d])
                 if d in leave_dict:
                     record.update(leave_dict[d])
+
+                # Determine status for 'blank days'
+                if not record["attendance_status"] and not record["leave_refno"]:
+                     record["attendance_status"] = "Blank Day"
 
                 daily_report.append(record)
 
@@ -190,7 +218,9 @@ class EmployeeReportAPIView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Better to log the full exception on the server side
+            print(f"Database error: {e}")
+            return Response({"error": "An internal server error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class EmployeeDetailsByUserAPIView(APIView):
     """
