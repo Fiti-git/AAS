@@ -19,7 +19,6 @@ from dateutil import parser
 logger = logging.getLogger(__name__)
 
 
-# POST /attendance/punch-in
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def punch_in(request):
@@ -40,8 +39,7 @@ def punch_in(request):
 
         if open_attendance:
             return Response({"error": "You must punch out from your previous session before punching in again"}, status=400)
-            
-
+        
         check_in_lat = float(data.get('check_in_lat'))
         check_in_long = float(data.get('check_in_long'))
         photo_file = request.FILES.get('photo_check_in')
@@ -93,6 +91,23 @@ def punch_in(request):
                 logger.error(f"Face comparison error for employee {employee.employee_id}: {str(e)}")
                 return Response({"error": "Could not process image. Ensure your face is clearly visible."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Check if the employee has an approved leave on the punch-in date
+        leave_record = EmpLeave.objects.filter(
+            employee=employee,
+            leave_date=timezone.now().date(),
+            status='approved'
+        ).first()
+
+        if leave_record:
+            # Update the leave status to 'rejected' and add a remark
+            leave_record.status = 'rejected'
+            leave_record.remarks = f"Employee punched in on an approved leave day: {timezone.now().date()}"
+            leave_record.save()
+
+            # Notify the reason for rejection
+            response_message = "Punch-in recorded. Leave for this day has been rejected."
+
+        # Create the attendance record
         attendance = Attendance.objects.create(
             employee=employee,
             date=timezone.now().date(),
@@ -101,7 +116,6 @@ def punch_in(request):
             check_in_long=check_in_long,
             punchin_verification=verified_status
         )
-
 
         return Response({
             "message": response_message,
@@ -283,17 +297,23 @@ def update_attendance(request):
     # Update check-in time if provided
     if new_check_in:
         try:
-            # Store the original check-in time
-            original_check_in_time = str(attendance.check_in_time) if attendance.check_in_time else None
             check_in_dt = parser.parse(new_check_in)
+
+            # Preserve the first-ever original time if already recorded
+            if 'checkin_update' in notes and 'Original_check_in_time' in notes['checkin_update']:
+                original_check_in_time = notes['checkin_update']['Original_check_in_time']
+            else:
+                original_check_in_time = str(attendance.check_in_time) if attendance.check_in_time else None
+
             attendance.check_in_time = check_in_dt
-            # Update the note to include both original and updated times
+
             notes['checkin_update'] = {
                 "updated_by": request.user.username,
                 "Original_check_in_time": original_check_in_time,
-                "check_in_time": str(attendance.check_in_time),
+                "check_in_time": str(check_in_dt),
                 "updated_at": timezone.now().isoformat()
             }
+
             attendance.punchin_verification = 'Verified'
         except Exception as e:
             return Response({"error": f"Invalid check_in_time format: {str(e)}"},
@@ -302,17 +322,23 @@ def update_attendance(request):
     # Update check-out time if provided
     if new_check_out:
         try:
-            # Store the original check-out time
-            original_check_out_time = str(attendance.check_out_time) if attendance.check_out_time else None
             check_out_dt = parser.parse(new_check_out)
+
+            # Preserve the first-ever original time if already recorded
+            if 'checkout_update' in notes and 'Original_check_out_time' in notes['checkout_update']:
+                original_check_out_time = notes['checkout_update']['Original_check_out_time']
+            else:
+                original_check_out_time = str(attendance.check_out_time) if attendance.check_out_time else None
+
             attendance.check_out_time = check_out_dt
-            # Update the note to include both original and updated times
+
             notes['checkout_update'] = {
                 "updated_by": request.user.username,
                 "Original_check_out_time": original_check_out_time,
-                "check_out_time": str(attendance.check_out_time),
+                "check_out_time": str(check_out_dt),
                 "updated_at": timezone.now().isoformat()
             }
+
             attendance.punchout_verification = 'Verified'
         except Exception as e:
             return Response({"error": f"Invalid check_out_time format: {str(e)}"},
@@ -753,15 +779,16 @@ def add_leave(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def bulk_add_attendance(request):
-    """
-    Adds or updates attendance for multiple employees using a single outlet's location.
+    """ 
+    Adds or updates attendance for multiple employees using a single outlet's location. 
+    If the employee has an approved leave on the given date, attendance is not added.
     """
     data = request.data
     employee_ids = data.get('employee_ids')
     date_str = data.get('date')
     check_in_str = data.get('check_in_time')
     check_out_str = data.get('check_out_time')
-    outlet_id = data.get('outlet_id') # Expecting outlet_id from frontend
+    outlet_id = data.get('outlet_id')  # Expecting outlet_id from frontend
 
     # --- Validation ---
     if not all([employee_ids, date_str, check_in_str, check_out_str, outlet_id]):
@@ -769,7 +796,7 @@ def bulk_add_attendance(request):
             {"error": "employee_ids, outlet_id, date, check_in_time, and check_out_time are required."},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
     # --- Get Outlet Location ---
     try:
         outlet = Outlet.objects.get(id=outlet_id)
@@ -792,16 +819,17 @@ def bulk_add_attendance(request):
             {"error": "Invalid date or time format. Use YYYY-MM-DD for date and HH:MM for time."},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
     # --- Processing ---
     successful_updates = []
     failed_updates = []
+    leave_updates = []  # To store employees who have approved leave on the given day
 
     delta = check_out_dt - check_in_dt
     worked_hours = round(delta.total_seconds() / 3600, 2)
     ot_hours = max(0, worked_hours - 8)
     status_val = 'Present' if worked_hours >= 4 else 'Half Day'
-    
+
     notes = {
         'manual_bulk_add': {
             "updated_by": request.user.username,
@@ -812,7 +840,7 @@ def bulk_add_attendance(request):
     # Find which employees exist from the provided list
     existing_employees = Employee.objects.filter(employee_id__in=employee_ids)
     existing_employee_ids = {emp.employee_id for emp in existing_employees}
-    
+
     # Determine which IDs were not found
     for emp_id in employee_ids:
         if emp_id not in existing_employee_ids:
@@ -820,6 +848,20 @@ def bulk_add_attendance(request):
 
     # Process only the employees that were found
     for employee in existing_employees:
+        # Check if the employee has an approved leave on the attendance date
+        leave_exists = EmpLeave.objects.filter(
+            employee=employee,
+            leave_date=attendance_date,
+            status='approved'
+        ).exists()
+
+        if leave_exists:
+            leave_updates.append({
+                "employee_id": employee.employee_id,
+                "error": "Employee has an approved leave on this date."
+            })
+            continue  # Skip attendance creation for this employee
+
         try:
             Attendance.objects.update_or_create(
                 employee=employee,
@@ -846,7 +888,8 @@ def bulk_add_attendance(request):
     return Response({
         "message": f"Bulk operation completed. {len(successful_updates)} records processed.",
         "successful_updates": successful_updates,
-        "failed_updates": failed_updates
+        "failed_updates": failed_updates,
+        "leave_updates": leave_updates  # Include employees with approved leaves
     }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
