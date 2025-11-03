@@ -60,8 +60,8 @@ class EmployeeReportAPIView(APIView):
                 ROUND(EXTRACT(EPOCH FROM (MAX(check_out_time) - MIN(check_in_time))) / 3600, 2) AS worked_hours,
                 MAX(status) AS attendance_status,
                 JSON_AGG(verification_notes) AS verification_notes
-            FROM main_attendance
-            WHERE DATE(check_in_time) BETWEEN %s AND %s  -- Filter attendance by date range early
+            FROM public.main_attendance
+            WHERE DATE(check_in_time) BETWEEN %s AND %s
             GROUP BY employee_id, DATE(check_in_time)
         ),
         approved_leaves AS (
@@ -73,10 +73,15 @@ class EmployeeReportAPIView(APIView):
                 lt.id AS leave_type_id,
                 lt.att_type,
                 lt.att_type_name
-            FROM main_empleave l
-            LEFT JOIN leave_type lt ON l.leave_type_id = lt.id
+            FROM public.main_empleave l
+            LEFT JOIN public.leave_type lt ON l.leave_type_id = lt.id
             WHERE l.status = 'approved'
-              AND l.leave_date BETWEEN %s AND %s -- Filter leaves by date range early
+            AND l.leave_date BETWEEN %s AND %s
+        ),
+        all_dates AS (
+            SELECT work_date AS common_date, employee_id FROM daily_attendance
+            UNION
+            SELECT leave_date AS common_date, employee_id FROM approved_leaves
         )
         SELECT
             e.employee_id,
@@ -86,7 +91,7 @@ class EmployeeReportAPIView(APIView):
             e.inactive_date,
             eo.outlet_names,
             eo.outlet_ids,
-            da.work_date,
+            ad.common_date AS work_date,
             da.check_in_time,
             da.check_out_time,
             da.worked_hours,
@@ -98,17 +103,14 @@ class EmployeeReportAPIView(APIView):
             al.leave_type_id,
             al.att_type,
             al.att_type_name
-        FROM main_employee e
+        FROM public.main_employee e
         LEFT JOIN auth_user u ON e.user_id = u.id
         LEFT JOIN emp_outlets eo ON e.employee_id = eo.employee_id
-        -- Use FULL OUTER JOIN to get a union of attendance and leave days
-        FULL OUTER JOIN daily_attendance da ON e.employee_id = da.employee_id
-        FULL OUTER JOIN approved_leaves al
-            ON e.employee_id = al.employee_id
-           AND COALESCE(da.work_date, al.leave_date) = al.leave_date -- Join attendance and leave on the same date
+        INNER JOIN all_dates ad ON ad.employee_id = e.employee_id
+        LEFT JOIN daily_attendance da ON e.employee_id = da.employee_id AND ad.common_date = da.work_date
+        LEFT JOIN approved_leaves al ON e.employee_id = al.employee_id AND ad.common_date = al.leave_date
         WHERE e.employee_id = %s
-          AND COALESCE(da.work_date, al.leave_date) IS NOT NULL -- Ensure we only get dates with some activity (should be covered by the date filter in CTEs but good practice)
-        ORDER BY COALESCE(da.work_date, al.leave_date) DESC;
+        ORDER BY ad.common_date DESC;
         """
 
         params = [start_date, end_date, start_date, end_date, employee_id]
