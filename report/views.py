@@ -612,3 +612,285 @@ class EmployeeAttendanceSummaryAPIView(APIView):
             return Response(rows, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class DashboardOverviewByOutletAPIView(APIView):
+    """
+    Returns dashboard overview filtered by outlet_id.
+    If outlet_id is not provided or is 'all', returns data for all outlets.
+    """
+    
+    def get(self, request, outlet_id=None):
+        # Get outlet_id from URL parameter or query parameter
+        if outlet_id is None:
+            outlet_id = request.query_params.get('outlet_id', 'all')
+        
+        # Convert 'all' or empty string to None for query logic
+        if outlet_id == 'all' or outlet_id == '':
+            outlet_id = None
+        
+        query = """
+        WITH
+        -- 1. Filter the base list of employees by outlet (if provided)
+        filtered_employees AS (
+            SELECT e.employee_id, e.is_active
+            FROM public.main_employee e
+            {outlet_join}
+            {outlet_where}
+        ),
+        -- 2. Summarize employee counts for the filtered group
+        emp_summary AS (
+            SELECT
+                COUNT(fe.employee_id) AS total_emp,
+                COUNT(fe.employee_id) FILTER (WHERE fe.is_active = TRUE) AS active_emp,
+                COUNT(fe.employee_id) FILTER (WHERE fe.is_active = FALSE) AS inactive_emp
+            FROM filtered_employees fe
+        ),
+        -- 3. Outlet count (1 if specific outlet selected, otherwise all)
+        outlet_summary AS (
+            SELECT
+                CASE 
+                    WHEN %s IS NOT NULL THEN 1
+                    ELSE COUNT(*)
+                END AS outlet_count 
+            FROM public.main_outlet
+        ),
+        -- 4. Today's presence count for the filtered active employees
+        attendance_summary AS (
+            SELECT
+                COUNT(DISTINCT a.employee_id) AS present_emp
+            FROM public.main_attendance a
+            INNER JOIN filtered_employees fe ON fe.employee_id = a.employee_id AND fe.is_active = TRUE
+            WHERE a.date = CURRENT_DATE
+              AND (a.status ILIKE 'present' OR a.status = '1')
+        ),
+        -- 5. Today's approved leave count for the filtered active employees
+        leave_today AS (
+            SELECT
+                COUNT(DISTINCT l.employee_id) AS on_leave
+            FROM public.main_empleave l
+            INNER JOIN filtered_employees fe ON fe.employee_id = l.employee_id AND fe.is_active = TRUE
+            WHERE l.leave_date = CURRENT_DATE
+              AND l.status ILIKE 'approved'
+        ),
+        -- 6. Pending leaves count for the filtered active employees
+        pending_leaves AS (
+            SELECT COUNT(*) AS pending_leave_req
+            FROM public.main_empleave l
+            INNER JOIN filtered_employees fe ON fe.employee_id = l.employee_id AND fe.is_active = TRUE
+            WHERE l.status ILIKE 'pending'
+        )
+        -- 7. Final selection and Absentee calculation
+        SELECT
+            e.total_emp,
+            e.active_emp,
+            e.inactive_emp,
+            o.outlet_count AS outlets,
+            COALESCE(a.present_emp, 0) AS present,
+            COALESCE(l.on_leave, 0) AS on_leave,
+            (e.active_emp - COALESCE(a.present_emp, 0) - COALESCE(l.on_leave, 0)) AS absentee,
+            p.pending_leave_req
+        FROM emp_summary e
+        CROSS JOIN outlet_summary o
+        CROSS JOIN attendance_summary a
+        CROSS JOIN leave_today l
+        CROSS JOIN pending_leaves p;
+        """
+        
+        # Dynamic query construction based on outlet_id
+        if outlet_id:
+            outlet_join = "INNER JOIN public.main_employee_outlets eo ON eo.employee_id = e.employee_id"
+            outlet_where = "WHERE eo.outlet_id = %s"
+            params = [outlet_id, outlet_id]
+        else:
+            outlet_join = ""
+            outlet_where = ""
+            params = [None]
+        
+        final_query = query.format(outlet_join=outlet_join, outlet_where=outlet_where)
+        
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(final_query, params)
+                columns = [col[0] for col in cursor.description]
+                row = cursor.fetchone()
+                data = dict(zip(columns, row))
+            
+            # Add outlet_id to response for clarity
+            data['filter_outlet_id'] = outlet_id
+            
+            return Response(data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class LeavePresenceTrendByOutletAPIView(APIView):
+    """
+    Returns 7-day leave/presence trend filtered by outlet_id.
+    """
+    
+    def get(self, request, outlet_id=None):
+        if outlet_id is None:
+            outlet_id = request.query_params.get('outlet_id', 'all')
+        
+        if outlet_id == 'all' or outlet_id == '':
+            outlet_id = None
+        
+        query = """
+        WITH
+        -- Filter active employees by outlet
+        active_emp AS (
+          SELECT DISTINCT e.employee_id 
+          FROM public.main_employee e
+          {outlet_join}
+          WHERE e.is_active = TRUE
+          {outlet_where}
+        ),
+        dates AS (
+          SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, INTERVAL '1 day')::date AS date
+        ),
+        present_summary AS (
+          SELECT
+            a.date::date AS date,
+            COUNT(DISTINCT a.employee_id) AS present_count
+          FROM public.main_attendance a
+          INNER JOIN active_emp e ON e.employee_id = a.employee_id
+          WHERE a.date BETWEEN CURRENT_DATE - INTERVAL '6 days' AND CURRENT_DATE
+            AND (a.status ILIKE 'present' OR a.status = '1')
+          GROUP BY a.date
+        ),
+        leave_summary AS (
+          SELECT
+            l.leave_date::date AS date,
+            COUNT(DISTINCT l.employee_id) AS leave_count
+          FROM public.main_empleave l
+          INNER JOIN active_emp e ON e.employee_id = l.employee_id
+          WHERE l.leave_date BETWEEN CURRENT_DATE - INTERVAL '6 days' AND CURRENT_DATE
+            AND l.status ILIKE 'approved'
+          GROUP BY l.leave_date
+        ),
+        total_emp AS (
+          SELECT COUNT(*) AS active_count FROM active_emp
+        )
+        SELECT
+          to_char(d.date, 'DD-Mon') AS date_label,
+          COALESCE(l.leave_count, 0) AS leave,
+          COALESCE(p.present_count, 0) AS present,
+          (t.active_count - COALESCE(p.present_count, 0) - COALESCE(l.leave_count, 0)) AS not_marked
+        FROM dates d
+        CROSS JOIN total_emp t
+        LEFT JOIN present_summary p ON d.date = p.date
+        LEFT JOIN leave_summary l ON d.date = l.date
+        ORDER BY d.date;
+        """
+        
+        if outlet_id:
+            outlet_join = "INNER JOIN public.main_employee_outlets eo ON eo.employee_id = e.employee_id"
+            outlet_where = "AND eo.outlet_id = %s"
+            params = [outlet_id]
+        else:
+            outlet_join = ""
+            outlet_where = ""
+            params = []
+        
+        final_query = query.format(outlet_join=outlet_join, outlet_where=outlet_where)
+        
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(final_query, params)
+                columns = [col[0] for col in cursor.description]
+                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            return Response(rows, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class EmployeeAttendanceSummaryByOutletAPIView(APIView):
+    """
+    Returns employee attendance summary for current month filtered by outlet_id.
+    """
+    
+    def get(self, request, outlet_id=None):
+        if outlet_id is None:
+            outlet_id = request.query_params.get('outlet_id', 'all')
+        
+        if outlet_id == 'all' or outlet_id == '':
+            outlet_id = None
+        
+        query = """
+        WITH
+        emp_outlet AS (
+          SELECT
+            e.employee_id,
+            u.first_name AS fullname,
+            u.username AS empcode,
+            o.name AS outlet_name
+          FROM public.main_employee e
+          LEFT JOIN public.auth_user u ON u.id = e.user_id
+          LEFT JOIN public.main_employee_outlets eo ON eo.employee_id = e.employee_id
+          LEFT JOIN public.main_outlet o ON o.id = eo.outlet_id
+          WHERE e.is_active = TRUE
+          {outlet_where}
+        ),
+        date_range AS (
+          SELECT generate_series(date_trunc('month', CURRENT_DATE)::date, CURRENT_DATE, '1 day'::interval) AS day
+        ),
+        present_days AS (
+          SELECT
+            a.employee_id,
+            COUNT(DISTINCT a.date) AS present_days
+          FROM public.main_attendance a
+          INNER JOIN emp_outlet eo ON eo.employee_id = a.employee_id
+          WHERE a.date >= date_trunc('month', CURRENT_DATE)
+            AND a.date <= CURRENT_DATE
+            AND (a.status ILIKE 'present' OR a.status = '1')
+          GROUP BY a.employee_id
+        ),
+        leave_days AS (
+          SELECT
+            l.employee_id,
+            COUNT(DISTINCT l.leave_date) AS leave_days
+          FROM public.main_empleave l
+          INNER JOIN emp_outlet eo ON eo.employee_id = l.employee_id
+          WHERE l.leave_date >= date_trunc('month', CURRENT_DATE)
+            AND l.leave_date <= CURRENT_DATE
+            AND l.status ILIKE 'approved'
+          GROUP BY l.employee_id
+        ),
+        working_days AS (
+          SELECT COUNT(*) AS total_days FROM date_range
+        ),
+        employee_summary AS (
+          SELECT
+            eo.employee_id,
+            eo.outlet_name,
+            eo.fullname,
+            eo.empcode,
+            COALESCE(pd.present_days, 0) AS present_days,
+            COALESCE(ld.leave_days, 0) AS leave_days,
+            wd.total_days - COALESCE(pd.present_days, 0) - COALESCE(ld.leave_days, 0) AS absent_days
+          FROM emp_outlet eo
+          LEFT JOIN present_days pd ON pd.employee_id = eo.employee_id
+          LEFT JOIN leave_days ld ON ld.employee_id = eo.employee_id
+          CROSS JOIN working_days wd
+          ORDER BY eo.outlet_name, eo.fullname
+        )
+        SELECT * FROM employee_summary;
+        """
+        
+        if outlet_id:
+            outlet_where = "AND eo.outlet_id = %s"
+            params = [outlet_id]
+        else:
+            outlet_where = ""
+            params = []
+        
+        final_query = query.format(outlet_where=outlet_where)
+        
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(final_query, params)
+                columns = [col[0] for col in cursor.description]
+                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            return Response(rows, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
