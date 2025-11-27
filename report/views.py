@@ -675,3 +675,76 @@ class EmployeeDetailsByUserAPIView(APIView):
         except Exception as e:
             print("EmployeeDetailsByUserAPIView error:", e)
             return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class EmployeesByManagerAPIView(APIView):
+    """
+    Returns all employees under a manager, grouped by outlet.
+    """
+    def get(self, request, user_id):
+        try:
+            query = """
+            WITH mgr AS (
+                SELECT e.employee_id, e.user_id, u.first_name AS user_first_name, e.fullname
+                FROM public.main_employee e
+                LEFT JOIN public.auth_user u ON u.id = e.user_id
+                WHERE e.user_id = %s
+            ),
+            emp_outlet AS (
+                SELECT 
+                    eo.outlet_id,
+                    o.name AS outlet_name,
+                    e.employee_id,
+                    u.first_name AS user_first_name,
+                    e.fullname
+                FROM public.main_employee e
+                LEFT JOIN public.main_employee_outlets eo ON eo.employee_id = e.employee_id
+                LEFT JOIN public.main_outlet o ON o.id = eo.outlet_id
+                LEFT JOIN public.auth_user u ON u.id = e.user_id
+            )
+            SELECT * FROM mgr;
+            """
+
+            rows = run_sql(query, [user_id])
+            if not rows:
+                return Response({"detail": "Manager not found"}, status=404)
+
+            manager = rows[0]
+
+            # Now fetch employees under each outlet
+            q2 = """
+            SELECT 
+                eo.outlet_id,
+                o.name AS outlet_name,
+                e.employee_id,
+                u.first_name AS user_first_name,
+                e.fullname
+            FROM public.main_employee e
+            LEFT JOIN public.main_employee_outlets eo ON eo.employee_id = e.employee_id
+            LEFT JOIN public.main_outlet o ON o.id = eo.outlet_id
+            LEFT JOIN public.auth_user u ON u.id = e.user_id
+            ORDER BY eo.outlet_id, e.fullname;
+            """
+            rows2 = run_sql(q2)
+
+            employees_by_outlet = {}
+            for r in rows2:
+                oid = r["outlet_id"]
+                if oid not in employees_by_outlet:
+                    employees_by_outlet[oid] = {
+                        "outlet_name": r["outlet_name"],
+                        "employees": []
+                    }
+                employees_by_outlet[oid]["employees"].append({
+                    "employee_id": r["employee_id"],
+                    "fullname": r["fullname"],
+                    "user_first_name": r["user_first_name"],
+                })
+
+            return Response({
+                "manager": manager,
+                "employees_by_outlet": employees_by_outlet
+            })
+
+        except Exception as e:
+            print("EmployeesByManagerAPIView error:", e)
+            return Response({"error": "Internal server error"}, 500)

@@ -10,6 +10,7 @@ from .views import (
     DashboardOverviewByOutletAPIView,
     LeavePresenceTrendByOutletAPIView,
     EmployeeAttendanceSummaryByOutletAPIView,
+    EmployeesByManagerAPIView,
 )
 
 urlpatterns = [
@@ -33,5 +34,5 @@ urlpatterns = [
 
     # Existing employee endpoints
     path('employee/<int:employee_id>/', EmployeeReportAPIView.as_view(), name='employee_report'),
-    path('employees/user/<int:user_id>/', EmployeeDetailsByUserAPIView.as_view(), name='employees_by_user'),
+    path('employees/user/<int:user_id>/', EmployeesByManagerAPIView.as_view(), name='employees_by_user'),
 ]
