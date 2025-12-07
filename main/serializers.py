@@ -174,3 +174,31 @@ class EmpLeaveCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmpLeave
         fields = ['employee', 'leave_date', 'leave_type', 'remarks']
+
+
+class LeaveEmployeeSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+
+    class Meta:
+        model = Employee
+        fields = [
+            'employee_id',
+            'first_name',
+            'last_name',
+            'outlets',
+        ]
+class SimpleLeaveSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.fullname', read_only=True)
+    leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)
+
+    class Meta:
+        model = EmpLeave
+        fields = [
+            'leave_refno',
+            'leave_date',
+            'remarks',
+            'status',
+            'employee_name',
+            'leave_type_name',
+        ]

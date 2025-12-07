@@ -57,6 +57,8 @@ urlpatterns = [
     path('api/users/', include('users.apiurls')),
     path('admintool/', include('face_recognition.urls')),
     path('outletsalldata/<int:pk>/', OutletDetailView.as_view(), name='outlet-detail'),
+    path('api/simple-employees/', views.get_simple_employees, name='simple_employees'),
+    path('api/simple-leave-requests/', views.get_simple_leave_requests, name='simple_leave_requests'),
     path('report/', include('report.urls')),
     
 ]

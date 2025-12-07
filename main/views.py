@@ -1,12 +1,12 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from rest_framework.decorators import api_view,permission_classes
-from .models import Agency, Employee, Outlet, Role, Holiday , LeaveType, Devices, Attendance
+from .models import Agency, EmpLeave, Employee, Outlet, Role, Holiday , LeaveType, Devices, Attendance
 from django.contrib.auth.hashers import make_password
 from rest_framework.response import Response
 from rest_framework import status, generics
 from django.contrib.auth.models import User, Group
-from .serializers import  OutletSerializer, EmployeeSerializer, AgencySerializer, HolidaySerializer, LeaveTypeSerializer, AttendanceSerializer,EmployeeDetailSerializer,OutletDetailSerializer
+from .serializers import  OutletSerializer, EmployeeSerializer, AgencySerializer, HolidaySerializer, LeaveTypeSerializer, AttendanceSerializer,EmployeeDetailSerializer,OutletDetailSerializer,LeaveEmployeeSerializer,SimpleLeaveSerializer
 from django.shortcuts import render
 from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
@@ -68,6 +68,43 @@ def deactivate_employee(request, employee_id):
         "inactive_date": employee.inactive_date
     })
 
+@api_view(['GET'])
+def get_simple_employees(request):
+    employees = Employee.objects.filter(is_active=True)
+    serializer = LeaveEmployeeSerializer(employees, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+def get_simple_leave_requests(request):
+    outlet_id = request.GET.get('outlet_id')
+    employee_name = request.GET.get('employee_name')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    if not outlet_id:
+        return Response({"error": "outlet_id is required"}, status=400)
+
+    # Base Query
+    leaves = EmpLeave.objects.filter(employee__outlets__id=outlet_id)
+
+    # Filter by employee name (case insensitive)
+    if employee_name:
+        leaves = leaves.filter(employee__fullname__icontains=employee_name)
+
+    # Filter by date range
+    if start_date and end_date:
+        leaves = leaves.filter(leave_date__range=[start_date, end_date])
+    elif start_date:
+        leaves = leaves.filter(leave_date__gte=start_date)
+    elif end_date:
+        leaves = leaves.filter(leave_date__lte=end_date)
+
+    leaves = leaves.order_by('-leave_refno')
+
+    serializer = SimpleLeaveSerializer(leaves, many=True)
+    return Response(serializer.data)
+
+    
 
 
 @api_view(['GET'])
