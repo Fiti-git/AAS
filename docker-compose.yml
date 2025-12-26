@@ -51,8 +51,6 @@
 #   aas_pgdata:
 #   pgadmin_data:
 
-version: "3.8"
-
 services:
   db:
     image: postgres:15
@@ -65,10 +63,6 @@ services:
       - aas_pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-
-  # ❌ REMOVE pgadmin in production
-  # pgadmin:
-  #   image: dpage/pgadmin4
 
   web:
     build: .
@@ -93,3 +87,6 @@ services:
     env_file:
       - .env
     restart: always
+
+volumes:
+  aas_pgdata:
