@@ -13,6 +13,8 @@ from .views import (
     EmployeesByManagerAPIView,
     OutletLeaveListAPIView,
     LeaveStatusUpdateAPIView,
+    LeaveBulkCreateAPIView,
+    OutletDataAPIView,
 )
 
 urlpatterns = [
@@ -41,4 +43,6 @@ urlpatterns = [
     #leave report
     path('leaves/outlet/', OutletLeaveListAPIView.as_view(), name='outlet-leave-list'),
     path('leaves/<int:leave_refno>/status/', LeaveStatusUpdateAPIView.as_view(), name='leave-status-update'),
+    path('leaves/bulk_create/', LeaveBulkCreateAPIView.as_view(), name='leave-bulk-create'),
+    path("leaves/outlet-data/", OutletDataAPIView.as_view(), name="leave-outlet-data"),
 ]

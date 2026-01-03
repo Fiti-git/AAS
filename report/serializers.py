@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from main.models import EmpLeave
+from main.models import EmpLeave, LeaveType
 
 class EmpLeaveSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='employee.user.username', read_only=True)
@@ -24,3 +24,33 @@ class EmpLeaveSerializer(serializers.ModelSerializer):
             'remarks',
             'status',
         ]
+
+
+class LeaveCreateSerializer(serializers.Serializer):
+    outlet_id = serializers.IntegerField()
+    employee_ids = serializers.ListField(
+        child=serializers.IntegerField(), allow_empty=False
+    )
+    leave_dates = serializers.ListField(
+        child=serializers.DateField(), allow_empty=False
+    )
+    leave_type_id = serializers.IntegerField()
+    remarks = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_outlet_id(self, value):
+        from .models import Outlet
+        if not Outlet.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Invalid outlet id")
+        return value
+
+    def validate_leave_type_id(self, value):
+        if not LeaveType.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Invalid leave type id")
+        return value
+
+    def validate_employee_ids(self, value):
+        from .models import Employee
+        # Optional: Check employees belong to outlet, but can skip here or add logic in view
+        if not Employee.objects.filter(employee_id__in=value).exists():
+            raise serializers.ValidationError("One or more invalid employee ids")
+        return value

@@ -8,8 +8,12 @@ from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from django.utils.dateparse import parse_date
 
-from main.models import EmpLeave
-from .serializers import EmpLeaveSerializer
+from main.models import EmpLeave, Employee, LeaveType, Outlet
+from .serializers import EmpLeaveSerializer, LeaveCreateSerializer
+
+from django.utils.timezone import now
+
+
 
 MAX_RANGE_DAYS = 366  # protect against huge ranges
 
@@ -825,3 +829,90 @@ class LeaveStatusUpdateAPIView(APIView):
             "leave_refno": leave.leave_refno,
             "status": leave.status
         })
+
+
+
+class LeaveBulkCreateAPIView(APIView):
+    def post(self, request):
+        serializer = LeaveCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        outlet_id = serializer.validated_data['outlet_id']
+        employee_ids = serializer.validated_data['employee_ids']
+        leave_dates = serializer.validated_data['leave_dates']
+        leave_type_id = serializer.validated_data['leave_type_id']
+        remarks = serializer.validated_data.get('remarks', '')
+
+        # Optional: Verify employees belong to outlet
+        employees = Employee.objects.filter(employee_id__in=employee_ids, outlets__id=outlet_id).distinct()
+        if employees.count() != len(employee_ids):
+            return Response(
+                {"detail": "Some employees do not belong to the selected outlet."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        leave_type = LeaveType.objects.get(id=leave_type_id)
+        created_records = []
+
+        for employee in employees:
+            for leave_date in leave_dates:
+                leave_record = EmpLeave.objects.create(
+                    employee=employee,
+                    leave_date=leave_date,
+                    leave_type=leave_type,
+                    remarks=remarks,
+                    add_date=now().date(),
+                    status='pending'
+                )
+                created_records.append({
+                    "leave_refno": leave_record.leave_refno,
+                    "employee_id": employee.employee_id,
+                    "leave_date": leave_date,
+                    "leave_type_id": leave_type_id,
+                    "remarks": remarks,
+                    "status": leave_record.status,
+                })
+
+        return Response({"created": created_records}, status=status.HTTP_201_CREATED)
+    
+
+
+class OutletDataAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        # User outlets from your user api, if needed
+        outlets = user.employee.outlets.all()  # Assuming OneToOne user→employee, M2M to outlets
+
+        # Serialize outlets minimally
+        outlets_data = [{"id": o.id, "name": o.name} for o in outlets]
+
+        # Optional: if you want employees for all outlets, or just empty list initially
+        # Here, send employees grouped by outlet id
+        employees = Employee.objects.filter(outlets__in=outlets).distinct()
+
+        # You might want to serialize employee id and fullname only
+        employees_data = [
+            {
+                "employee_id": e.employee_id,
+                "fullname": e.fullname,
+                "outlet_ids": list(e.outlets.values_list("id", flat=True)),
+            }
+            for e in employees
+        ]
+
+        # Leave Types
+        leave_types = LeaveType.objects.filter(active=True)
+        leave_types_data = [
+            {"id": lt.id, "att_type": lt.att_type, "att_type_name": lt.att_type_name}
+            for lt in leave_types
+        ]
+
+        return Response({
+            "outlets": outlets_data,
+            "employees": employees_data,
+            "leave_types": leave_types_data,
+        })
+
