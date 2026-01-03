@@ -4,6 +4,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import connection
 from datetime import datetime, date, timedelta
+from django.utils import timezone
+from rest_framework.permissions import IsAuthenticated
+from django.utils.dateparse import parse_date
+
+from main.models import EmpLeave
+from .serializers import EmpLeaveSerializer
 
 MAX_RANGE_DAYS = 366  # protect against huge ranges
 
@@ -748,3 +754,74 @@ class EmployeesByManagerAPIView(APIView):
         except Exception as e:
             print("EmployeesByManagerAPIView error:", e)
             return Response({"error": "Internal server error"}, 500)
+
+# ------------------------------------------------
+# 7) EmpLeave Serializer (for future use)
+
+
+class OutletLeaveListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        outlet_id = request.GET.get('outlet_id')
+        start_date = parse_date(request.GET.get('start_date'))
+        end_date = parse_date(request.GET.get('end_date'))
+
+        queryset = EmpLeave.objects.select_related(
+            'employee__user',
+            'leave_type'
+        ).prefetch_related(
+            'employee__outlets'
+        )
+
+        # Filter by outlet
+        if outlet_id:
+            queryset = queryset.filter(employee__outlets__id=outlet_id)
+
+        # Filter by leave_date range
+        if start_date and end_date:
+            queryset = queryset.filter(leave_date__range=[start_date, end_date])
+        elif start_date:
+            queryset = queryset.filter(leave_date__gte=start_date)
+        elif end_date:
+            queryset = queryset.filter(leave_date__lte=end_date)
+
+        serializer = EmpLeaveSerializer(queryset, many=True)
+
+        return Response({
+            "count": queryset.count(),
+            "results": serializer.data
+        })
+
+
+
+class LeaveStatusUpdateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, leave_refno):
+        try:
+            leave = EmpLeave.objects.get(leave_refno=leave_refno)
+        except EmpLeave.DoesNotExist:
+            return Response(
+                {"error": "Leave record not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        new_status = request.data.get("status")
+
+        if new_status not in ['approved', 'rejected', 'cancelled', 'pending']:
+            return Response(
+                {"error": "Invalid status"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        leave.status = new_status
+        leave.action_user = request.user
+        leave.action_date = timezone.now().date()
+        leave.save()
+
+        return Response({
+            "message": "Leave status updated successfully",
+            "leave_refno": leave.leave_refno,
+            "status": leave.status
+        })

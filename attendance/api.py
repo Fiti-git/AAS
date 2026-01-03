@@ -85,7 +85,7 @@ def punch_in(request):
                 if result.get('FaceMatches'):
                     verified_status = 'Verified'
                 else:
-                    return Response({"error": "Face recognition failed. Please try again."}, status=status.HTTP_401_UNAUTHORIZED)
+                    return Response({"error": "Face recognition failed. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
             
             except Exception as e:
                 logger.error(f"Face comparison error for employee {employee.employee_id}: {str(e)}")

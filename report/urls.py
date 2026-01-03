@@ -11,6 +11,8 @@ from .views import (
     LeavePresenceTrendByOutletAPIView,
     EmployeeAttendanceSummaryByOutletAPIView,
     EmployeesByManagerAPIView,
+    OutletLeaveListAPIView,
+    LeaveStatusUpdateAPIView,
 )
 
 urlpatterns = [
@@ -35,4 +37,8 @@ urlpatterns = [
     # Existing employee endpoints
     path('employee/<int:employee_id>/', EmployeeReportAPIView.as_view(), name='employee_report'),
     path('employees/user/<int:user_id>/', EmployeesByManagerAPIView.as_view(), name='employees_by_user'),
+
+    #leave report
+    path('leaves/outlet/', OutletLeaveListAPIView.as_view(), name='outlet-leave-list'),
+    path('leaves/<int:leave_refno>/status/', LeaveStatusUpdateAPIView.as_view(), name='leave-status-update'),
 ]
