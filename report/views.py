@@ -891,28 +891,25 @@ class OutletDataAPIView(APIView):
     def get(self, request):
         user = request.user
 
-        # Auth user first name
-        auth_first_name = user.first_name
-
-        # Safely get employee
         try:
             employee = user.employee
         except Employee.DoesNotExist:
             return Response(
                 {"detail": "User is not linked to an employee"},
-                status=status.HTTP_400_BAD_REQUEST
+                status=400
             )
 
-        # Outlets assigned to manager
+        # Outlets (still manager-specific)
         outlets = employee.outlets.all()
         outlets_data = [{"id": o.id, "name": o.name} for o in outlets]
 
-        # Employees under those outlets
-        employees = Employee.objects.filter(outlets__in=outlets).distinct()
+        # ✅ ALL EMPLOYEES
+        employees = Employee.objects.select_related("user").prefetch_related("outlets")
         employees_data = [
             {
                 "employee_id": e.employee_id,
-                "fullname": e.fullname,
+                "username": e.user.username,
+                "first_name": e.user.first_name,
                 "outlet_ids": list(e.outlets.values_list("id", flat=True)),
             }
             for e in employees
@@ -930,10 +927,6 @@ class OutletDataAPIView(APIView):
         ]
 
         return Response({
-            "auth_user": {
-                "username": user.username,
-                "first_name": auth_first_name,
-            },
             "outlets": outlets_data,
             "employees": employees_data,
             "leave_types": leave_types_data,
