@@ -891,6 +891,9 @@ class OutletDataAPIView(APIView):
     def get(self, request):
         user = request.user
 
+        # Auth user first name
+        auth_first_name = user.first_name
+
         # Safely get employee
         try:
             employee = user.employee
@@ -927,6 +930,10 @@ class OutletDataAPIView(APIView):
         ]
 
         return Response({
+            "auth_user": {
+                "username": user.username,
+                "first_name": auth_first_name,
+            },
             "outlets": outlets_data,
             "employees": employees_data,
             "leave_types": leave_types_data,
