@@ -833,6 +833,8 @@ class LeaveStatusUpdateAPIView(APIView):
 
 
 class LeaveBulkCreateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         serializer = LeaveCreateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -844,8 +846,12 @@ class LeaveBulkCreateAPIView(APIView):
         leave_type_id = serializer.validated_data['leave_type_id']
         remarks = serializer.validated_data.get('remarks', '')
 
-        # Optional: Verify employees belong to outlet
-        employees = Employee.objects.filter(employee_id__in=employee_ids, outlets__id=outlet_id).distinct()
+        # Verify employees belong to outlet
+        employees = Employee.objects.filter(
+            employee_id__in=employee_ids,
+            outlets__id=outlet_id
+        ).distinct()
+
         if employees.count() != len(employee_ids):
             return Response(
                 {"detail": "Some employees do not belong to the selected outlet."},
@@ -862,20 +868,21 @@ class LeaveBulkCreateAPIView(APIView):
                     leave_date=leave_date,
                     leave_type=leave_type,
                     remarks=remarks,
-                    add_date=now().date(),
                     status='pending'
                 )
+
                 created_records.append({
                     "leave_refno": leave_record.leave_refno,
                     "employee_id": employee.employee_id,
                     "leave_date": leave_date,
-                    "leave_type_id": leave_type_id,
-                    "remarks": remarks,
+                    "leave_type": leave_type.att_type_name,
                     "status": leave_record.status,
                 })
 
-        return Response({"created": created_records}, status=status.HTTP_201_CREATED)
-    
+        return Response(
+            {"created_count": len(created_records), "records": created_records},
+            status=status.HTTP_201_CREATED
+        )
 
 
 class OutletDataAPIView(APIView):
@@ -883,17 +890,22 @@ class OutletDataAPIView(APIView):
 
     def get(self, request):
         user = request.user
-        # User outlets from your user api, if needed
-        outlets = user.employee.outlets.all()  # Assuming OneToOne user→employee, M2M to outlets
 
-        # Serialize outlets minimally
+        # Safely get employee
+        try:
+            employee = user.employee
+        except Employee.DoesNotExist:
+            return Response(
+                {"detail": "User is not linked to an employee"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Outlets assigned to manager
+        outlets = employee.outlets.all()
         outlets_data = [{"id": o.id, "name": o.name} for o in outlets]
 
-        # Optional: if you want employees for all outlets, or just empty list initially
-        # Here, send employees grouped by outlet id
+        # Employees under those outlets
         employees = Employee.objects.filter(outlets__in=outlets).distinct()
-
-        # You might want to serialize employee id and fullname only
         employees_data = [
             {
                 "employee_id": e.employee_id,
@@ -906,7 +918,11 @@ class OutletDataAPIView(APIView):
         # Leave Types
         leave_types = LeaveType.objects.filter(active=True)
         leave_types_data = [
-            {"id": lt.id, "att_type": lt.att_type, "att_type_name": lt.att_type_name}
+            {
+                "id": lt.id,
+                "att_type": lt.att_type,
+                "att_type_name": lt.att_type_name,
+            }
             for lt in leave_types
         ]
 
@@ -915,4 +931,3 @@ class OutletDataAPIView(APIView):
             "employees": employees_data,
             "leave_types": leave_types_data,
         })
-
