@@ -997,6 +997,13 @@ class EmployeeDetailView(APIView):
 
             emp.fullname = request.data.get("fullname", emp.fullname)
 
+            # ✅ ADD THIS BLOCK (DELETE IMAGES)
+            if request.data.get("clear_images") == "true":
+                emp.reference_photo = None
+                emp.punchin_selfie = None
+                emp.punchout_selfie = None
+
+            # Existing logic (keep this)
             if "reference_photo" in request.FILES:
                 emp.reference_photo = request.FILES["reference_photo"]
 
@@ -1007,11 +1014,11 @@ class EmployeeDetailView(APIView):
                 emp.punchout_selfie = request.FILES["punchout_selfie"]
 
             emp.save()
-
             return Response(employee_to_dict(emp), status=status.HTTP_200_OK)
 
         except Employee.DoesNotExist:
             return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+
 
     def delete(self, request, pk):
         try:
