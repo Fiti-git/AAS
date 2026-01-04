@@ -15,6 +15,8 @@ from .views import (
     LeaveStatusUpdateAPIView,
     LeaveBulkCreateAPIView,
     OutletDataAPIView,
+    EmployeeListCreateView,
+    EmployeeDetailView,
 )
 
 urlpatterns = [
@@ -45,4 +47,8 @@ urlpatterns = [
     path('leaves/<int:leave_refno>/status/', LeaveStatusUpdateAPIView.as_view(), name='leave-status-update'),
     path('leaves/bulk_create/', LeaveBulkCreateAPIView.as_view(), name='leave-bulk-create'),
     path("leaves/outlet-data/", OutletDataAPIView.as_view(), name="leave-outlet-data"),
+
+    # Employee details by user
+    path("employees/", EmployeeListCreateView.as_view()),
+    path("employees/<int:pk>/", EmployeeDetailView.as_view()),
 ]

@@ -7,7 +7,7 @@ from datetime import datetime, date, timedelta
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from django.utils.dateparse import parse_date
-
+from django.contrib.auth.models import User
 from main.models import EmpLeave, Employee, LeaveType, Outlet
 from .serializers import EmpLeaveSerializer, LeaveCreateSerializer
 
@@ -931,3 +931,94 @@ class OutletDataAPIView(APIView):
             "employees": employees_data,
             "leave_types": leave_types_data,
         })
+
+
+# ------------------------------------------------
+# Empoyee Refernga image 
+
+def employee_to_dict(emp):
+    return {
+        "employee_id": emp.employee_id,
+
+        # Auth User fields
+        "username": emp.user.username,
+        "first_name": emp.user.first_name,
+
+        # Employee fields
+        "fullname": emp.fullname,
+        "reference_photo": emp.reference_photo.url if emp.reference_photo else None,
+        "punchin_selfie": emp.punchin_selfie.url if emp.punchin_selfie else None,
+        "punchout_selfie": emp.punchout_selfie.url if emp.punchout_selfie else None,
+    }
+
+class EmployeeListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        employees = Employee.objects.select_related('user').all()
+        data = [employee_to_dict(emp) for emp in employees]
+        return Response(data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        try:
+            user = User.objects.get(id=request.data.get("user_id"))
+
+            employee = Employee.objects.create(
+                user=user,
+                fullname=request.data.get("fullname"),
+                reference_photo=request.FILES.get("reference_photo"),
+                punchin_selfie=request.FILES.get("punchin_selfie"),
+                punchout_selfie=request.FILES.get("punchout_selfie"),
+            )
+
+            return Response(employee_to_dict(employee), status=status.HTTP_201_CREATED)
+
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Invalid user_id"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+class EmployeeDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk):
+        return Employee.objects.select_related('user').get(employee_id=pk)
+
+    def get(self, request, pk):
+        try:
+            emp = self.get_object(pk)
+            return Response(employee_to_dict(emp), status=status.HTTP_200_OK)
+        except Employee.DoesNotExist:
+            return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    def put(self, request, pk):
+        try:
+            emp = self.get_object(pk)
+
+            emp.fullname = request.data.get("fullname", emp.fullname)
+
+            if "reference_photo" in request.FILES:
+                emp.reference_photo = request.FILES["reference_photo"]
+
+            if "punchin_selfie" in request.FILES:
+                emp.punchin_selfie = request.FILES["punchin_selfie"]
+
+            if "punchout_selfie" in request.FILES:
+                emp.punchout_selfie = request.FILES["punchout_selfie"]
+
+            emp.save()
+
+            return Response(employee_to_dict(emp), status=status.HTTP_200_OK)
+
+        except Employee.DoesNotExist:
+            return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, pk):
+        try:
+            emp = self.get_object(pk)
+            emp.delete()
+            return Response({"message": "Employee deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+        except Employee.DoesNotExist:
+            return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+
