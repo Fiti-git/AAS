@@ -23,7 +23,13 @@ logger = logging.getLogger(__name__)
 @permission_classes([IsAuthenticated])
 def punch_in(request):
     try:
-        employee = request.user.employee
+        try:
+            employee = request.user.employee
+        except:
+            return Response(
+                {"error": "Employee profile not found for this user"},
+                status=status.HTTP_403_FORBIDDEN
+            )
         data = request.data
 
         if not all(field in data for field in ['check_in_lat', 'check_in_long']):
@@ -40,8 +46,15 @@ def punch_in(request):
         if open_attendance:
             return Response({"error": "You must punch out from your previous session before punching in again"}, status=400)
         
-        check_in_lat = float(data.get('check_in_lat'))
-        check_in_long = float(data.get('check_in_long'))
+        try:
+            check_in_lat = float(data.get('check_in_lat'))
+            check_in_long = float(data.get('check_in_long'))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Invalid latitude or longitude"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         photo_file = request.FILES.get('photo_check_in')
 
         if not verify_location(employee, check_in_lat, check_in_long):
@@ -126,90 +139,18 @@ def punch_in(request):
         logger.error(f"Punch-in error: {str(e)}", exc_info=True)
         return Response({"error": "An unexpected error occurred during punch-in"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# @api_view(['POST'])
-# @permission_classes([IsAuthenticated])
-# def punch_out(request):
-#     try:
-#         employee = request.user.employee
-#         data = request.data
-
-#         if not all(field in data for field in ['check_out_lat', 'check_out_long']):
-#             return Response({"error": "Missing required location fields"}, status=status.HTTP_400_BAD_REQUEST)
-        
-#         if 'photo_check_out' not in request.FILES:
-#             return Response({"error": "Photo is required for punch-out"}, status=status.HTTP_400_BAD_REQUEST)
-
-#         attendance = Attendance.objects.filter(
-#             employee=employee,
-#             check_out_time__isnull=True
-#         ).last()
-
-#         if not attendance:
-#             return Response({"error": "No active punch-in session found"}, status=400)
-            
-#         # CORRECTED: More robust check. Do not create a reference photo on punch-out.
-#         if not employee.reference_photo:
-#             employee.reference_photo = photo_file
-#             employee.save()
-#             # return Response({"error": "Cannot punch out because your face is not enrolled."}, status=status.HTTP_400_BAD_REQUEST)
-
-#         check_out_lat = float(data.get('check_out_lat'))
-#         check_out_long = float(data.get('check_out_long'))
-#         photo_file = request.FILES.get('photo_check_out')
-
-#         if not verify_location(employee, check_out_lat, check_out_long):
-#             return Response(
-#                 {"error": "You're not at an allowed location for punch-out"},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-
-#         # CORRECTED: Use the new field name
-#         employee.punchout_selfie = photo_file
-#         employee.save()
-        
-#         try:
-#             employee.reference_photo.open('rb')
-#             employee.punchout_selfie.open('rb')
-#             source_bytes = employee.reference_photo.read()
-#             target_bytes = employee.punchout_selfie.read()
-#             employee.reference_photo.close()
-#             employee.punchout_selfie.close()
-            
-#             result = compare_faces(
-#                 source_bytes=source_bytes,
-#                 target_bytes=target_bytes,
-#                 aws_access_key=settings.AWS_ACCESS_KEY_ID,
-#                 aws_secret_key=settings.AWS_SECRET_ACCESS_KEY,
-#                 aws_region=settings.AWS_REKOGNITION_REGION
-#             )
-
-#             if not result.get('FaceMatches'):
-#                 return Response({"error": "Face recognition failed. Please try again."}, status=status.HTTP_401_UNAUTHORIZED)
-        
-#         except Exception as e:
-#             logger.error(f"Face comparison error during punch-out for employee {employee.employee_id}: {str(e)}")
-#             return Response({"error": "Could not process image. Ensure your face is clearly visible."}, status=status.HTTP_400_BAD_REQUEST)
-
-#         attendance.check_out_time = timezone.now()
-#         attendance.check_out_lat = check_out_lat
-#         attendance.check_out_long = check_out_long
-#         attendance.punchout_verification = "Verified" 
-#         attendance.save()
-
-#         return Response({
-#             "message": "Punch-out recorded successfully!",
-#             "data": AttendanceSerializer(attendance).data
-#         }, status=status.HTTP_200_OK)
-
-#     except Exception as e:
-#         logger.error(f"Punch-out error: {str(e)}", exc_info=True)
-#         return Response({"error": "An error occurred during punch-out"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def punch_out(request):
     try:
-        employee = request.user.employee
+        try:
+            employee = request.user.employee
+        except:
+            return Response(
+                {"error": "Employee profile not found for this user"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         data = request.data
 
         # 1. Validate location fields
@@ -236,8 +177,14 @@ def punch_out(request):
             return Response({"error": "Reference photo missing. Contact admin."}, status=400)
 
         # 5. Parse location
-        check_out_lat = float(data.get('check_out_lat'))
-        check_out_long = float(data.get('check_out_long'))
+        try:
+            check_out_lat = float(data.get('check_out_lat'))
+            check_out_long = float(data.get('check_out_long'))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Invalid latitude or longitude"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # 6. Verify location
         if not verify_location(employee, check_out_lat, check_out_long):
