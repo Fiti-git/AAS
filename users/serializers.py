@@ -1,22 +1,14 @@
+from django.contrib.auth.models import User
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework import serializers
+
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['name'] = user.username
 
-    def validate(self, attrs):
-        try:
-            data = super().validate(attrs)
-        except Exception:
-            raise serializers.ValidationError(
-                {"error": "Invalid username or password"}
-            )
+        groups = user.groups.all()
+        token['role'] = groups[0].name if groups else None  # Safe check
 
-        user = self.user
-
-        data["user_id"] = user.id
-        data["username"] = user.username
-
-        group = user.groups.first()
-        data["role"] = group.name if group else "employee"
-
-        return data
+        return token
