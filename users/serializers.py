@@ -3,16 +3,20 @@ from rest_framework import serializers
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
-    @classmethod
-    def get_token(cls, user):
-        token = super().get_token(user)
+    def validate(self, attrs):
+        try:
+            data = super().validate(attrs)
+        except Exception:
+            raise serializers.ValidationError(
+                {"error": "Invalid username or password"}
+            )
 
-        # Basic user info
-        token["user_id"] = user.id
-        token["username"] = user.username
+        user = self.user
 
-        # SAFE group/role handling (NO IndexError)
+        data["user_id"] = user.id
+        data["username"] = user.username
+
         group = user.groups.first()
-        token["role"] = group.name if group else "employee"
+        data["role"] = group.name if group else "employee"
 
-        return token
+        return data
