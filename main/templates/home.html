@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arunalus Supermarket Backend</title>
+    <title>Arunalus Supermarket – Backend Status</title>
+
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f6f8;
+            background: linear-gradient(135deg, #f4f6f8, #e9eef3);
             color: #333;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
@@ -20,32 +20,83 @@
         .container {
             background: white;
             padding: 40px 60px;
-            border-radius: 12px;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            border-radius: 14px;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
             text-align: center;
+            max-width: 520px;
+            width: 90%;
         }
 
         h1 {
             color: #2c3e50;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 15px;
+            color: #6c757d;
+            margin-bottom: 30px;
         }
 
         .status {
-            font-size: 20px;
-            color: green;
-            margin-top: 15px;
+            font-size: 22px;
+            font-weight: 600;
+            color: #28a745;
+            margin-bottom: 20px;
         }
 
         .status::before {
-            content: "✅ ";
+            content: "🟢 ";
+        }
+
+        .info {
+            text-align: left;
+            margin-top: 20px;
+            font-size: 14px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .info div {
+            margin-bottom: 8px;
+        }
+
+        .label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        footer {
+            margin-top: 25px;
+            font-size: 12px;
+            color: #999;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
-        <h1>Arunalus Supermarket Backend</h1>
-        <p>This is the backend service for Arunalus Supermarket.</p>
-        <p class="status">Running</p>
+        <h1>Arunalus Supermarket</h1>
+        <div class="subtitle">Backend API Service</div>
+
+        <div class="status">Service Running</div>
+
+        <div class="info">
+            <div><span class="label">Environment:</span> Production</div>
+            <div><span class="label">API Base:</span> /api/</div>
+            <div><span class="label">Server:</span> DigitalOcean Droplet</div>
+            <div><span class="label">Last Checked:</span> <span id="time"></span></div>
+        </div>
+
+        <footer>
+            © 2026 Arunalus Supermarket • Backend System
+        </footer>
     </div>
+
+    <script>
+        document.getElementById("time").innerText =
+            new Date().toLocaleString();
+    </script>
 </body>
 </html>
