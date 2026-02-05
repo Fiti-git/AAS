@@ -13,7 +13,26 @@ services:
 
   web:
     build: .
+    restart: always
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      DATABASE_NAME: aas_db
+      DATABASE_USER: aas_user
+      DATABASE_PASSWORD: secure_password123
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+    volumes:
+      - aas_media:/app/media
+    ports:
+      - "8000:8000"
+
+    # ✅ Run migrations first, then start gunicorn
     command: >
+      sh -c "
+      python manage.py migrate --noinput &&
       gunicorn aas.wsgi:application
       --bind 0.0.0.0:8000
       --worker-class gthread
@@ -27,21 +46,8 @@ services:
       --access-logfile -
       --error-logfile -
       --log-level info
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-    env_file:
-      - .env
-    environment:
-      DATABASE_NAME: aas_db
-      DATABASE_USER: aas_user
-      DATABASE_PASSWORD: secure_password123
-      DATABASE_HOST: db
-      DATABASE_PORT: 5432
-    volumes:
-      - aas_media:/app/media
-    restart: always
+      --access-logformat '%(h)s \"%(r)s\" %(s)s %(b)s %(L)s'
+      "
 
 volumes:
   aas_pgdata:
