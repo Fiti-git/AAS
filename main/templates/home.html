@@ -1,102 +1,170 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arunalus Supermarket – Backend Status</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arunalus Supermarket – Backend Status</title>
 
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f4f6f8, #e9eef3);
-            color: #333;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-        }
+  <!-- Bootstrap 5 -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
 
-        .container {
-            background: white;
-            padding: 40px 60px;
-            border-radius: 14px;
-            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
-            text-align: center;
-            max-width: 520px;
-            width: 90%;
-        }
-
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-
-        .subtitle {
-            font-size: 15px;
-            color: #6c757d;
-            margin-bottom: 30px;
-        }
-
-        .status {
-            font-size: 22px;
-            font-weight: 600;
-            color: #28a745;
-            margin-bottom: 20px;
-        }
-
-        .status::before {
-            content: "🟢 ";
-        }
-
-        .info {
-            text-align: left;
-            margin-top: 20px;
-            font-size: 14px;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-        }
-
-        .info div {
-            margin-bottom: 8px;
-        }
-
-        .label {
-            font-weight: 600;
-            color: #495057;
-        }
-
-        footer {
-            margin-top: 25px;
-            font-size: 12px;
-            color: #999;
-        }
-    </style>
+  <style>
+    body {
+      background: linear-gradient(135deg, #f4f6f8, #e9eef3);
+      min-height: 100vh;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      background: #adb5bd;
+    }
+  </style>
 </head>
 
-<body>
-    <div class="container">
-        <h1>Arunalus Supermarket</h1>
-        <div class="subtitle">Backend API Service</div>
+<body class="d-flex align-items-center justify-content-center py-4">
 
-        <div class="status">Service Running</div>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-md-10 col-lg-8">
 
-        <div class="info">
-            <div><span class="label">Environment:</span> Production</div>
-            <div><span class="label">API Base:</span> /api/</div>
-            <div><span class="label">Server:</span> DigitalOcean Droplet</div>
-            <div><span class="label">Last Checked:</span> <span id="time"></span></div>
+        <div class="card shadow-lg border-0 rounded-4">
+          <div class="card-body p-4 p-md-5">
+
+            <!-- Header -->
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
+              <div>
+                <h3 class="mb-1">Arunalus Supermarket</h3>
+                <div class="text-muted small">
+                  Backend API Service • Status Page
+                </div>
+              </div>
+
+              <div class="mt-3 mt-md-0">
+                <span class="badge rounded-pill bg-light text-dark px-3 py-2">
+                  <span id="healthDot" class="status-dot me-2"></span>
+                  <span id="healthText">Checking…</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Info grid -->
+            <div class="row g-3">
+              <div class="col-12 col-sm-6">
+                <div class="border rounded-3 p-3 bg-light h-100">
+                  <div class="text-muted small">Environment</div>
+                  <div class="fw-semibold">Production</div>
+                </div>
+              </div>
+
+              <div class="col-12 col-sm-6">
+                <div class="border rounded-3 p-3 bg-light h-100">
+                  <div class="text-muted small">API Base</div>
+                  <div class="fw-semibold">/api/</div>
+                </div>
+              </div>
+
+              <div class="col-12 col-sm-6">
+                <div class="border rounded-3 p-3 bg-light h-100">
+                  <div class="text-muted small">Server Time</div>
+                  <div class="fw-semibold" id="serverTime">—</div>
+                </div>
+              </div>
+
+              <div class="col-12 col-sm-6">
+                <div class="border rounded-3 p-3 bg-light h-100">
+                  <div class="text-muted small">Uptime (this page)</div>
+                  <div class="fw-semibold" id="uptime">—</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="d-grid d-md-flex gap-2 mt-4">
+              <a href="/health/" class="btn btn-outline-success" target="_blank">
+                Health Check
+              </a>
+              <a href="/admin/" class="btn btn-outline-primary" target="_blank">
+                Admin
+              </a>
+              <a href="/api/" class="btn btn-outline-secondary" target="_blank">
+                API Base
+              </a>
+              <button class="btn btn-outline-dark" id="copyBtn">
+                Copy API URL
+              </button>
+            </div>
+
+            <!-- Footer -->
+            <div class="text-center text-muted small mt-4">
+              © 2026 Arunalus Supermarket • Backend System
+            </div>
+
+          </div>
         </div>
 
-        <footer>
-            © 2026 Arunalus Supermarket • Backend System
-        </footer>
+      </div>
     </div>
+  </div>
 
-    <script>
-        document.getElementById("time").innerText =
-            new Date().toLocaleString();
-    </script>
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // Server time
+    function updateTime() {
+      document.getElementById("serverTime").innerText =
+        new Date().toLocaleString();
+    }
+    updateTime();
+    setInterval(updateTime, 10000);
+
+    // Uptime
+    const start = Date.now();
+    function updateUptime() {
+      const s = Math.floor((Date.now() - start) / 1000);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const r = s % 60;
+      document.getElementById("uptime").innerText =
+        `${h}h ${m}m ${r}s`;
+    }
+    updateUptime();
+    setInterval(updateUptime, 1000);
+
+    // Health check
+    async function checkHealth() {
+      const dot = document.getElementById("healthDot");
+      const text = document.getElementById("healthText");
+
+      try {
+        const res = await fetch("/health/", { cache: "no-store" });
+        if (!res.ok) throw new Error();
+        dot.style.background = "#28a745";
+        text.innerText = "Healthy";
+      } catch {
+        dot.style.background = "#dc3545";
+        text.innerText = "Unhealthy";
+      }
+    }
+    checkHealth();
+    setInterval(checkHealth, 30000);
+
+    // Copy API URL
+    document.getElementById("copyBtn").onclick = async () => {
+      const url = `${location.origin}/api/`;
+      try {
+        await navigator.clipboard.writeText(url);
+        alert("Copied: " + url);
+      } catch {
+        prompt("Copy this URL:", url);
+      }
+    };
+  </script>
+
 </body>
 </html>
