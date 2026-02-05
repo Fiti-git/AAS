@@ -16,11 +16,17 @@ services:
     command: >
       gunicorn aas.wsgi:application
       --bind 0.0.0.0:8000
-      --worker-class gevent
-      --workers 2
-      --timeout 120
+      --worker-class gthread
+      --workers 3
+      --threads 4
+      --timeout 60
+      --graceful-timeout 30
+      --keep-alive 5
       --max-requests 800
       --max-requests-jitter 100
+      --access-logfile -
+      --error-logfile -
+      --log-level info
     ports:
       - "8000:8000"
     depends_on:
