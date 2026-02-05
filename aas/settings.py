@@ -44,7 +44,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'aas.middleware.DisableCSRFMiddleware',  # Custom middleware to disable CSRF for /api/ paths
+    #'aas.middleware.DisableCSRFMiddleware',  # Custom middleware to disable CSRF for /api/ paths
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
