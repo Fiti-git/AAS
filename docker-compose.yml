@@ -16,8 +16,8 @@ services:
     command: >
       gunicorn aas.wsgi:application
       --bind 0.0.0.0:8000
+      --worker-class gevent
       --workers 2
-      --threads 2
       --timeout 120
       --max-requests 800
       --max-requests-jitter 100
@@ -25,14 +25,14 @@ services:
       - "8000:8000"
     depends_on:
       - db
-    environment:
-      - DATABASE_NAME=aas_db
-      - DATABASE_USER=aas_user
-      - DATABASE_PASSWORD=secure_password123
-      - DATABASE_HOST=db
-      - DATABASE_PORT=5432
     env_file:
       - .env
+    environment:
+      DATABASE_NAME: aas_db
+      DATABASE_USER: aas_user
+      DATABASE_PASSWORD: secure_password123
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
     volumes:
       - aas_media:/app/media
     restart: always
