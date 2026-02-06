@@ -33,7 +33,7 @@ services:
     command: >
       sh -c "
       python manage.py migrate --noinput &&
-      gunicorn aas.wsgi:application
+      exec gunicorn aas.wsgi:application
       --bind 0.0.0.0:8000
       --worker-class gthread
       --workers 3
@@ -41,13 +41,15 @@ services:
       --timeout 60
       --graceful-timeout 30
       --keep-alive 5
-      --max-requests 800
+      --max-requests 600
       --max-requests-jitter 100
       --access-logfile -
       --error-logfile -
+      --capture-output
       --log-level info
       --access-logformat '%(h)s \"%(r)s\" %(s)s %(b)s %(L)s'
       "
+
 
 volumes:
   aas_pgdata:
