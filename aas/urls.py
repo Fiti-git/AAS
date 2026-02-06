@@ -43,7 +43,7 @@ urlpatterns = [
     # -----------------
     # EMPLOYEES
     # -----------------
-    path('api/getemployees/', views.get_active_employees, name='get_employees'),
+    path('api/getemployees', views.get_active_employees, name='get_employees'),
     path('api/getallemployees/', views.get_all_employees, name='get_all_employees'),
     path('api/deactivate-employee/<int:employee_id>/', views.deactivate_employee, name='deactivate_employee'),
 
