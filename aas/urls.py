@@ -46,6 +46,7 @@ urlpatterns = [
     path('api/getemployees', views.get_active_employees, name='get_employees'),
     path('api/getallemployees/', views.get_all_employees, name='get_all_employees'),
     path('api/deactivate-employee/<int:employee_id>/', views.deactivate_employee, name='deactivate_employee'),
+    path('api/activate-employee/<int:employee_id>/', views.activate_employee, name='activate_employee'),
 
     # IMPORTANT: you have frontend calls without trailing slash sometimes
     path('api/getoutletemployees/', views.get_outlet_employees, name='get_outletemployees'),

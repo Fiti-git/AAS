@@ -53,11 +53,17 @@ def deactivate_employee(request, employee_id):
     try:
         employee = Employee.objects.select_related("user").get(employee_id=employee_id)
     except Employee.DoesNotExist:
-        return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": "Employee not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
     # Prevent double deactivation
     if not employee.is_active:
-        return Response({"error": "Employee already inactive"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": "Employee already inactive"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     # Deactivate employee
     today = timezone.now().date()
@@ -65,25 +71,54 @@ def deactivate_employee(request, employee_id):
     employee.inactive_date = today
     employee.save(update_fields=["is_active", "inactive_date"])
 
-    # Deactivate linked Django User (if exists)
+    # Deactivate linked User (if exists)
     if employee.user:
         employee.user.is_active = False
         employee.user.save(update_fields=["is_active"])
 
-    # Log status change (history)
-    EmployeeStatusLog.objects.create(
-        employee=employee,
-        action="DEACTIVATED",
-        action_by=request.user,
-        note="Deactivated via API"
-    )
-
     return Response({
         "message": f"Employee {employee.fullname} has been deactivated.",
         "employee_id": employee.employee_id,
-        "is_active": employee.user.is_active if employee.user else False,
+        "is_active": False,
         "inactive_date": employee.inactive_date
-    })
+    }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def activate_employee(request, employee_id):
+    try:
+        employee = Employee.objects.select_related("user").get(employee_id=employee_id)
+    except Employee.DoesNotExist:
+        return Response(
+            {"error": "Employee not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Prevent double activation
+    if employee.is_active:
+        return Response(
+            {"error": "Employee already active"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Activate employee
+    employee.is_active = True
+    employee.inactive_date = None
+    employee.save(update_fields=["is_active", "inactive_date"])
+
+    # Activate linked User (if exists)
+    if employee.user:
+        employee.user.is_active = True
+        employee.user.save(update_fields=["is_active"])
+
+    return Response({
+        "message": f"Employee {employee.fullname} has been activated.",
+        "employee_id": employee.employee_id,
+        "is_active": True,
+        "inactive_date": employee.inactive_date
+    }, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 def get_simple_employees(request):
