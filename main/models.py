@@ -1,8 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User, Group
-import uuid
 from django.core.exceptions import ValidationError
 import os
+from django.utils import timezone
 
 def reference_photo_upload_path(instance, filename):
     return os.path.join('reference_photos', str(instance.employee_id), filename)
@@ -240,3 +240,22 @@ class Devices(models.Model):
         target = self.user.username if self.user else self.outlet.name if self.outlet else "Unassigned"
         return f"{self.device_type} - {target}"
 
+class EmployeeStatusLog(models.Model):
+    ACTION_CHOICES = [
+        ("DEACTIVATED", "DEACTIVATED"),
+        ("ACTIVATED", "ACTIVATED"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="status_logs")
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    action_at = models.DateTimeField(default=timezone.now)
+
+    # who did it (admin/manager user)
+    action_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="employee_status_actions")
+
+    # optional
+    note = models.TextField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-action_at"]

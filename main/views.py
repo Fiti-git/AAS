@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from rest_framework.decorators import api_view,permission_classes
-from .models import Agency, EmpLeave, Employee, Outlet, Role, Holiday , LeaveType, Devices, Attendance
+from .models import Agency, EmpLeave, Employee, EmployeeStatusLog, Outlet, Role, Holiday , LeaveType, Devices, Attendance
 from django.contrib.auth.hashers import make_password
 from rest_framework.response import Response
 from rest_framework import status, generics
@@ -17,6 +17,7 @@ from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Prefetch
+from django.db import transaction
 
 
 
@@ -46,25 +47,41 @@ def get_active_employees(request):
     return Response(serializer.data)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
 def deactivate_employee(request, employee_id):
     try:
-        employee = Employee.objects.get(employee_id=employee_id)
+        employee = Employee.objects.select_related("user").get(employee_id=employee_id)
     except Employee.DoesNotExist:
         return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
-    
+
+    # Prevent double deactivation
+    if not employee.is_active:
+        return Response({"error": "Employee already inactive"}, status=status.HTTP_400_BAD_REQUEST)
+
     # Deactivate employee
+    today = timezone.now().date()
     employee.is_active = False
-    employee.inactive_date = timezone.now().date()
+    employee.inactive_date = today
     employee.save(update_fields=["is_active", "inactive_date"])
 
-    # Deactivate linked Django User
-    employee.user.is_active = False
-    employee.user.save(update_fields=["is_active"])
-    
+    # Deactivate linked Django User (if exists)
+    if employee.user:
+        employee.user.is_active = False
+        employee.user.save(update_fields=["is_active"])
+
+    # Log status change (history)
+    EmployeeStatusLog.objects.create(
+        employee=employee,
+        action="DEACTIVATED",
+        action_by=request.user,
+        note="Deactivated via API"
+    )
+
     return Response({
         "message": f"Employee {employee.fullname} has been deactivated.",
         "employee_id": employee.employee_id,
-        "is_active": employee.user.is_active,   # from auth_user
+        "is_active": employee.user.is_active if employee.user else False,
         "inactive_date": employee.inactive_date
     })
 
