@@ -146,6 +146,10 @@ urlpatterns = [
     # REPORTS
     # -----------------
     path('report/', include('report.urls')),
+
+    # -----------------
+    # OTHER APPS (if any)
+    # -----------------
 ]
 
 if settings.DEBUG:
