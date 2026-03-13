@@ -15,14 +15,11 @@ def verify_location(employee, lat, lon):
         for outlet in employee.outlets.all():
             # Calculate the distance using the haversine formula
             distance = haversine(lat, lon, outlet.latitude, outlet.longitude)
-            
+
             # If within the radius of any outlet, location is verified
             if distance <= outlet.radius_meters:
                 return True
         return False
-    except Exception as e:
-        return False
-
     except (Outlet.DoesNotExist, TypeError, AttributeError) as e:
         print(f"Location verification error: {e}")
         return False

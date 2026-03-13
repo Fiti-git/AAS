@@ -564,7 +564,7 @@ def group_detail(request, id):
     permissions_list = [{"id": permission.id, "name": permission.name} for permission in permissions]
     
     # Fetching the groupmeta description
-    group_meta = group.groupmeta
+    group_meta = group.role
     group_info = {
         "id": group.id,
         "name": group.name,
@@ -593,7 +593,7 @@ def deactivate_group(request, id):
 
     # Get associated GroupMeta object
     try:
-        group_meta = group.Role  # Assuming a OneToOne relationship
+        group_meta = group.role
     except Role.DoesNotExist:
         return Response({"detail": "GroupMeta not found for this group."}, status=status.HTTP_404_NOT_FOUND)
 

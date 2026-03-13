@@ -1,6 +1,7 @@
 # in your_app/face_recognition.py
 
 import boto3
+from botocore.config import Config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,12 @@ def compare_faces(source_bytes, target_bytes, aws_access_key, aws_secret_key, aw
             'rekognition',
             region_name=aws_region,
             aws_access_key_id=aws_access_key,
-            aws_secret_access_key=aws_secret_key
+            aws_secret_access_key=aws_secret_key,
+            config=Config(
+                connect_timeout=5,
+                read_timeout=15,
+                retries={'max_attempts': 1}
+            )
         )
 
         response = rekognition.compare_faces(
