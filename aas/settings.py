@@ -23,11 +23,12 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # ------------------------------------------------------------------------------
 # SECURITY
 # ------------------------------------------------------------------------------
-SECRET_KEY = 'django-insecure-0o(b@duchc*na=6x3022%zag8y(*m5#s#z%gq)1ng6@-p74dih'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-0o(b@duchc*na=6x3022%zag8y(*m5#s#z%gq)1ng6@-p74dih')
 
-DEBUG = True   # ✅ IMPORTANT: avoid freezes on errors
+DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']  # tighten later for production
+_allowed = os.getenv('DJANGO_ALLOWED_HOSTS', '*')
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',')]
 
 # ------------------------------------------------------------------------------
 # APPS
@@ -136,7 +137,11 @@ SIMPLE_JWT = {
 # ------------------------------------------------------------------------------
 # CORS
 # ------------------------------------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = True  # tighten later
+_cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if _cors_origins:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',')]
+else:
+    CORS_ALLOW_ALL_ORIGINS = True  # default: allow all (set CORS_ALLOWED_ORIGINS in env to restrict)
 
 # ------------------------------------------------------------------------------
 # URL / SLASH HANDLING

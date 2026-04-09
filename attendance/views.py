@@ -37,6 +37,9 @@ def db_health_check(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def download_db_backup(request):
+    if not request.user.groups.filter(name__in=["Manager", "Admin"]).exists() and not request.user.is_staff:
+        return Response({"error": "Permission denied."}, status=403)
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"/tmp/aas_backup_{timestamp}.sql"
 
