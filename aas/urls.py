@@ -8,6 +8,7 @@ from main import views
 from rest_framework_simplejwt.views import TokenRefreshView
 from users.views import CustomTokenObtainpairView
 from main.views import OutletDetailView
+from attendance.views import db_health_check, download_db_backup
 
 
 # ------------------------------------------------------------------------------
@@ -118,6 +119,12 @@ urlpatterns = [
     # -----------------
     path('api/devices/', views.get_all_devices, name='get_all_devices'),
     path('api/devices/delete/', views.delete_device, name='delete_device'),
+
+    # -----------------
+    # DATABASE BACKUP
+    # -----------------
+    path('api/db-health/', db_health_check, name='db-health'),
+    path('api/db-backup/', download_db_backup, name='db-backup'),
 
     # -----------------
     # ATTENDANCE
