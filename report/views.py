@@ -10,6 +10,7 @@ from django.utils.dateparse import parse_date
 from django.contrib.auth.models import User
 from main.models import EmpLeave, Employee, LeaveType, Outlet
 from .serializers import EmpLeaveSerializer, LeaveCreateSerializer
+from aas.pagination import StandardPagination
 
 from django.utils.timezone import now
 
@@ -790,12 +791,13 @@ class OutletLeaveListAPIView(APIView):
         elif end_date:
             queryset = queryset.filter(leave_date__lte=end_date)
 
-        serializer = EmpLeaveSerializer(queryset, many=True)
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = EmpLeaveSerializer(page if page is not None else queryset, many=True)
 
-        return Response({
-            "count": queryset.count(),
-            "results": serializer.data
-        })
+        if page is not None:
+            return paginator.get_paginated_response(serializer.data)
+        return Response({"count": queryset.count(), "results": serializer.data})
 
 
 
@@ -956,7 +958,11 @@ class EmployeeListCreateView(APIView):
 
     def get(self, request):
         employees = Employee.objects.select_related('user').all()
-        data = [employee_to_dict(emp) for emp in employees]
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(employees, request)
+        data = [employee_to_dict(emp) for emp in (page if page is not None else employees)]
+        if page is not None:
+            return paginator.get_paginated_response(data)
         return Response(data, status=status.HTTP_200_OK)
 
     def post(self, request):

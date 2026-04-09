@@ -18,6 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Prefetch
 from django.db import transaction
+from aas.pagination import paginate_queryset, StandardPagination
 
 
 
@@ -37,14 +38,12 @@ def get_agencies(request):
 @api_view(['GET'])
 def get_all_employees(request):
     employees = Employee.objects.all()
-    serializer = EmployeeSerializer(employees, many=True)
-    return Response(serializer.data)
+    return paginate_queryset(request, employees, EmployeeSerializer)
 
 @api_view(['GET'])
 def get_active_employees(request):
-    employees = Employee.objects.filter(is_active=True)  # only active
-    serializer = EmployeeSerializer(employees, many=True)
-    return Response(serializer.data)
+    employees = Employee.objects.filter(is_active=True)
+    return paginate_queryset(request, employees, EmployeeSerializer)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -123,8 +122,7 @@ def activate_employee(request, employee_id):
 @api_view(['GET'])
 def get_simple_employees(request):
     employees = Employee.objects.filter(is_active=True)
-    serializer = LeaveEmployeeSerializer(employees, many=True)
-    return Response(serializer.data)
+    return paginate_queryset(request, employees, LeaveEmployeeSerializer)
 
 @api_view(['GET'])
 def get_simple_leave_requests(request):
@@ -153,8 +151,7 @@ def get_simple_leave_requests(request):
 
     leaves = leaves.order_by('-leave_refno')
 
-    serializer = SimpleLeaveSerializer(leaves, many=True)
-    return Response(serializer.data)
+    return paginate_queryset(request, leaves, SimpleLeaveSerializer)
 
     
 
@@ -188,8 +185,7 @@ def get_outlet_employees(request):
 
     # Filter employees by outlet
     employees = Employee.objects.filter(outlets__id=outlet_id).distinct()
-    serializer = EmployeeSerializer(employees, many=True)
-    return Response(serializer.data)
+    return paginate_queryset(request, employees, EmployeeSerializer)
 
 # API to create an employee (and user)
 @api_view(['POST'])
@@ -714,13 +710,16 @@ def create_role(request):
 # GET Device API
 @api_view(['GET'])
 def get_all_devices(request):
-    devices = Devices.objects.all()
+    devices = Devices.objects.select_related('user__employee').all()
+
+    paginator = StandardPagination()
+    page = paginator.paginate_queryset(devices, request)
+    items = page if page is not None else devices
 
     device_list = []
-    for device in devices:
+    for device in items:
         user = device.user
         employee = getattr(user, 'employee', None)
-
         device_list.append({
             "device_id": device.device_id,
             "device_type": device.device_type,
@@ -730,6 +729,8 @@ def get_all_devices(request):
             "fullname": employee.fullname if employee else user.username if user else None,
         })
 
+    if page is not None:
+        return paginator.get_paginated_response(device_list)
     return Response(device_list, status=status.HTTP_200_OK)
 
 # DELETE Device API
