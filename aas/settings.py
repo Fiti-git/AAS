@@ -27,8 +27,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-0o(b@duchc*na=6x302
 
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 
-_allowed = os.getenv('DJANGO_ALLOWED_HOSTS', '*')
-ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',')]
+ALLOWED_HOSTS = ["*"]
 
 # ------------------------------------------------------------------------------
 # APPS
