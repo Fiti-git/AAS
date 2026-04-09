@@ -138,11 +138,7 @@ SIMPLE_JWT = {
 # ------------------------------------------------------------------------------
 # CORS
 # ------------------------------------------------------------------------------
-_cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', '')
-if _cors_origins:
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',')]
-else:
-    CORS_ALLOW_ALL_ORIGINS = True  # default: allow all (set CORS_ALLOWED_ORIGINS in env to restrict)
+CORS_ALLOW_ALL_ORIGINS = True  # default: allow all (set CORS_ALLOWED_ORIGINS in env to restrict)
 
 # ------------------------------------------------------------------------------
 # URL / SLASH HANDLING
