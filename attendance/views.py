@@ -9,6 +9,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 import subprocess
 from datetime import datetime
+from django.http import HttpResponse
+import psycopg2
+
 
 
 # Create your views here.
@@ -34,30 +37,48 @@ def db_health_check(request):
             "message": str(e)
         }, status=500)
     
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def download_db_backup(request):
+    # Permission check
     if not request.user.groups.filter(name__in=["Manager", "Admin"]).exists() and not request.user.is_staff:
-        return Response({"error": "Permission denied."}, status=403)
+        return HttpResponse("Permission denied", status=403)
 
+    # CSV filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = f"/tmp/aas_backup_{timestamp}.sql"
+    filename = f"db_backup_{timestamp}.csv"
 
-    command = [
-        "pg_dump",
-        "-h", settings.DATABASES['default']['HOST'],
-        "-U", settings.DATABASES['default']['USER'],
-        settings.DATABASES['default']['NAME'],
-    ]
+    # HTTP response setup
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
-    env = os.environ.copy()
-    env["PGPASSWORD"] = settings.DATABASES['default']['PASSWORD']
+    # Database connection from environment variables
+    db_name = os.environ.get("DATABASE_NAME", "aas_db")
+    db_user = os.environ.get("DATABASE_USER", "aas_user")
+    db_password = os.environ.get("DATABASE_PASSWORD", "your-db-password-here")
+    db_host = os.environ.get("DATABASE_HOST", "db")
+    db_port = os.environ.get("DATABASE_PORT", 5432)
 
-    with open(backup_file, "w") as f:
-        subprocess.run(command, stdout=f, env=env, check=True)
+    try:
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            dbname=db_name,
+            user=db_user,
+            password=db_password,
+            host=db_host,
+            port=db_port,
+        )
+        cur = conn.cursor()
 
-    return FileResponse(
-        open(backup_file, 'rb'),
-        as_attachment=True,
-        filename=os.path.basename(backup_file)
-    )
+        # Replace 'myapp_mymodel' with the table you want to export
+        cur.copy_expert("COPY myapp_mymodel TO STDOUT WITH CSV HEADER", response)
+
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        return HttpResponse(f"Error generating backup: {str(e)}", status=500)
+
+    return response
