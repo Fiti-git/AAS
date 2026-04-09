@@ -46,13 +46,9 @@ def download_db_backup(request):
     if not request.user.groups.filter(name__in=["Manager", "Admin"]).exists() and not request.user.is_staff:
         return HttpResponse("Permission denied", status=403)
 
-    # CSV filename with timestamp
+    # SQL filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"db_backup_{timestamp}.csv"
-
-    # HTTP response setup
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    backup_file = f"/tmp/aas_backup_{timestamp}.sql"
 
     # Database connection from environment variables
     db_name = os.environ.get("DATABASE_NAME", "aas_db")
@@ -61,24 +57,27 @@ def download_db_backup(request):
     db_host = os.environ.get("DATABASE_HOST", "db")
     db_port = os.environ.get("DATABASE_PORT", 5432)
 
+    env = os.environ.copy()
+    env["PGPASSWORD"] = db_password
+
+    command = [
+        "pg_dump",
+        "-h", db_host,
+        "-U", db_user,
+        "-F", "c",        # custom format (compressed)
+        "-b",             # include large objects
+        "-v",             # verbose
+        "-f", backup_file,
+        db_name
+    ]
+
     try:
-        # Connect to PostgreSQL
-        conn = psycopg2.connect(
-            dbname=db_name,
-            user=db_user,
-            password=db_password,
-            host=db_host,
-            port=db_port,
+        subprocess.run(command, env=env, check=True)
+        return FileResponse(
+            open(backup_file, 'rb'),
+            as_attachment=True,
+            filename=os.path.basename(backup_file)
         )
-        cur = conn.cursor()
 
-        # Replace 'myapp_mymodel' with the table you want to export
-        cur.copy_expert("COPY myapp_mymodel TO STDOUT WITH CSV HEADER", response)
-
-        cur.close()
-        conn.close()
-
-    except Exception as e:
-        return HttpResponse(f"Error generating backup: {str(e)}", status=500)
-
-    return response
+    except subprocess.CalledProcessError as e:
+        return HttpResponse(f"Error during backup: {str(e)}", status=500)
